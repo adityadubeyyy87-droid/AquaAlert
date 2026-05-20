@@ -3,13 +3,22 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: AquaAlert API - Citizen-powered water leak detection platform
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: reports
+    description: Water leak reports
+  - name: users
+    description: Citizen user profiles and points
+  - name: analytics
+    description: Dashboard analytics and aggregates
+  - name: wards
+    description: Ward-level data
+
 paths:
   /healthz:
     get:
@@ -24,6 +33,281 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /reports:
+    get:
+      operationId: listReports
+      tags: [reports]
+      summary: List all leak reports
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, verified, in_progress, resolved, rejected]
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+        - name: ward
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of reports
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Report"
+
+    post:
+      operationId: createReport
+      tags: [reports]
+      summary: Submit a new leak report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportInput"
+      responses:
+        "201":
+          description: Report created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+
+  /reports/{id}:
+    get:
+      operationId: getReport
+      tags: [reports]
+      summary: Get a single report
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Report details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+        "404":
+          description: Not found
+
+    patch:
+      operationId: updateReport
+      tags: [reports]
+      summary: Update report status (municipal authority)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReportUpdate"
+      responses:
+        "200":
+          description: Updated report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+
+  /reports/{id}/upvote:
+    post:
+      operationId: upvoteReport
+      tags: [reports]
+      summary: Upvote/confirm a report (citizen verification)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Upvote recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Report"
+
+  /users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List top citizen contributors (leaderboard)
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Register a new citizen user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user profile and points
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /analytics/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [analytics]
+      summary: Get overall platform summary stats
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /analytics/heatmap:
+    get:
+      operationId: getHeatmapData
+      tags: [analytics]
+      summary: Get geo-clustered heatmap data for map rendering
+      responses:
+        "200":
+          description: Heatmap data points
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/HeatmapPoint"
+
+  /analytics/severity-breakdown:
+    get:
+      operationId: getSeverityBreakdown
+      tags: [analytics]
+      summary: Get count of reports by severity level
+      responses:
+        "200":
+          description: Severity breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SeverityCount"
+
+  /analytics/status-breakdown:
+    get:
+      operationId: getStatusBreakdown
+      tags: [analytics]
+      summary: Get count of reports by status
+      responses:
+        "200":
+          description: Status breakdown
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StatusCount"
+
+  /analytics/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [analytics]
+      summary: Get recent report activity feed
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Report"
+
+  /wards:
+    get:
+      operationId: listWards
+      tags: [wards]
+      summary: List all wards with report counts
+      responses:
+        "200":
+          description: Ward list with stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WardStat"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +318,223 @@ components:
       required:
         - status
 
+    Report:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - latitude
+        - longitude
+        - severity
+        - status
+        - ward
+        - upvotes
+        - createdAt
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        status:
+          type: string
+          enum: [pending, verified, in_progress, resolved, rejected]
+        ward:
+          type: string
+        imageUrl:
+          type: ["string", "null"]
+        upvotes:
+          type: integer
+        userId:
+          type: ["integer", "null"]
+        reporterName:
+          type: ["string", "null"]
+        resolvedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+
+    ReportInput:
+      type: object
+      required:
+        - title
+        - description
+        - latitude
+        - longitude
+        - severity
+        - ward
+      properties:
+        title:
+          type: string
+          minLength: 3
+        description:
+          type: string
+          minLength: 10
+        latitude:
+          type: number
+        longitude:
+          type: number
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+        ward:
+          type: string
+        imageUrl:
+          type: ["string", "null"]
+        userId:
+          type: ["integer", "null"]
+        reporterName:
+          type: ["string", "null"]
+
+    ReportUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, verified, in_progress, resolved, rejected]
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+
+    User:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - ecoPoints
+        - reportsSubmitted
+        - reportsVerified
+        - createdAt
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        ecoPoints:
+          type: integer
+        reportsSubmitted:
+          type: integer
+        reportsVerified:
+          type: integer
+        badge:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    UserInput:
+      type: object
+      required:
+        - name
+        - email
+      properties:
+        name:
+          type: string
+          minLength: 2
+        email:
+          type: string
+        avatarUrl:
+          type: ["string", "null"]
+
+    DashboardSummary:
+      type: object
+      required:
+        - totalReports
+        - pendingReports
+        - resolvedReports
+        - criticalReports
+        - totalEcoPoints
+        - activeWards
+        - avgResolutionHours
+        - nrwReductionEstimate
+      properties:
+        totalReports:
+          type: integer
+        pendingReports:
+          type: integer
+        resolvedReports:
+          type: integer
+        criticalReports:
+          type: integer
+        totalEcoPoints:
+          type: integer
+        activeWards:
+          type: integer
+        avgResolutionHours:
+          type: number
+        nrwReductionEstimate:
+          type: number
+
+    HeatmapPoint:
+      type: object
+      required:
+        - latitude
+        - longitude
+        - intensity
+        - severity
+      properties:
+        latitude:
+          type: number
+        longitude:
+          type: number
+        intensity:
+          type: number
+        severity:
+          type: string
+
+    SeverityCount:
+      type: object
+      required:
+        - severity
+        - count
+      properties:
+        severity:
+          type: string
+        count:
+          type: integer
+
+    StatusCount:
+      type: object
+      required:
+        - status
+        - count
+      properties:
+        status:
+          type: string
+        count:
+          type: integer
+
+    WardStat:
+      type: object
+      required:
+        - ward
+        - totalReports
+        - pendingReports
+        - criticalReports
+        - resolvedReports
+      properties:
+        ward:
+          type: string
+        totalReports:
+          type: integer
+        pendingReports:
+          type: integer
+        criticalReports:
+          type: integer
+        resolvedReports:
+          type: integer
