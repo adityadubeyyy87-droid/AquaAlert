@@ -9,16 +9,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SEVERITY_COLORS, STATUS_COLORS } from "@/lib/constants";
-import { Search, MapPin, ExternalLink, FileX } from "lucide-react";
+import { Search, MapPin, ExternalLink, FileX, ThumbsUp } from "lucide-react";
+import { motion } from "framer-motion";
 
 function SeverityBadge({ severity }: { severity: string }) {
   const color = SEVERITY_COLORS[severity as keyof typeof SEVERITY_COLORS] ?? "#94a3b8";
   return (
-    <Badge
-      variant="outline"
-      className="text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide"
-      style={{ color, borderColor: `${color}50`, backgroundColor: `${color}0f` }}
-    >
+    <Badge variant="outline" className="text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide"
+      style={{ color, borderColor: `${color}50`, backgroundColor: `${color}10` }}>
       {severity}
     </Badge>
   );
@@ -26,17 +24,24 @@ function SeverityBadge({ severity }: { severity: string }) {
 
 function StatusDot({ status }: { status: string }) {
   const color = STATUS_COLORS[status as keyof typeof STATUS_COLORS] ?? "#94a3b8";
-  const label = status.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
   return (
     <div className="flex items-center gap-2">
-      <span
-        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-        style={{ backgroundColor: color, boxShadow: `0 0 4px ${color}80` }}
-      />
-      <span className="text-xs font-medium" style={{ color }}>{label}</span>
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color, boxShadow: `0 0 4px ${color}80` }} />
+      <span className="text-xs font-medium" style={{ color }}>
+        {status.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase())}
+      </span>
     </div>
   );
 }
+
+const rowVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.04, delayChildren: 0.1 } },
+};
+const rowItem = {
+  hidden: { opacity: 0, y: 6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.2 } },
+};
 
 export default function Reports() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -48,11 +53,10 @@ export default function Reports() {
     severity: severityFilter !== "all" ? (severityFilter as ListReportsSeverity) : undefined,
   });
 
-  const filteredReports = reports?.filter(
-    (r) =>
-      search === "" ||
-      r.title.toLowerCase().includes(search.toLowerCase()) ||
-      r.ward.toLowerCase().includes(search.toLowerCase())
+  const filteredReports = reports?.filter(r =>
+    search === "" ||
+    r.title.toLowerCase().includes(search.toLowerCase()) ||
+    r.ward.toLowerCase().includes(search.toLowerCase())
   );
 
   const isFiltered = statusFilter !== "all" || severityFilter !== "all" || search !== "";
@@ -67,13 +71,15 @@ export default function Reports() {
             <h1 className="text-3xl font-bold text-slate-100 mb-1">Report Directory</h1>
             <p className="text-slate-500 text-sm">Search and filter all reported water leaks across Mumbai.</p>
           </div>
-          {!isLoading && reports && (
-            <span className="text-sm font-bold bg-slate-900 border border-slate-800 text-slate-400 px-3 py-1.5 rounded-lg tabular-nums">
-              {filteredReports?.length ?? 0}
-              <span className="text-slate-600 font-normal ml-1">
-                {isFiltered ? "matching" : "total"} report{(filteredReports?.length ?? 0) !== 1 ? "s" : ""}
-              </span>
-            </span>
+          {!isLoading && filteredReports && (
+            <motion.span
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="text-sm font-bold bg-slate-900 border border-slate-800 text-slate-400 px-3 py-1.5 rounded-xl tabular-nums"
+            >
+              {filteredReports.length}
+              <span className="text-slate-600 font-normal ml-1">{isFiltered ? "matching" : "total"} report{filteredReports.length !== 1 ? "s" : ""}</span>
+            </motion.span>
           )}
         </div>
 
@@ -84,34 +90,33 @@ export default function Reports() {
             <Input
               placeholder="Search by title or ward…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={e => setSearch(e.target.value)}
               className="pl-10 bg-slate-950 border-slate-800 text-slate-100 focus:border-cyan-600 focus:ring-0 rounded-xl h-10"
             />
           </div>
           <div className="flex gap-3">
             <Select value={severityFilter} onValueChange={setSeverityFilter}>
-              <SelectTrigger className="w-[150px] bg-slate-950 border-slate-800 text-slate-300 rounded-xl h-10">
+              <SelectTrigger className="w-[148px] bg-slate-950 border-slate-800 text-slate-300 rounded-xl h-10">
                 <SelectValue placeholder="Severity" />
               </SelectTrigger>
               <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
                 <SelectItem value="all">All Severities</SelectItem>
-                <SelectItem value="critical">Critical</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="low">Low</SelectItem>
+                {["critical", "high", "medium", "low"].map(s => (
+                  <SelectItem key={s} value={s} style={{ color: SEVERITY_COLORS[s as keyof typeof SEVERITY_COLORS] }}>
+                    {s.charAt(0).toUpperCase() + s.slice(1)}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px] bg-slate-950 border-slate-800 text-slate-300 rounded-xl h-10">
+              <SelectTrigger className="w-[148px] bg-slate-950 border-slate-800 text-slate-300 rounded-xl h-10">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
                 <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="verified">Verified</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="resolved">Resolved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
+                {["pending", "verified", "in_progress", "resolved", "rejected"].map(s => (
+                  <SelectItem key={s} value={s}>{s.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase())}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -123,12 +128,12 @@ export default function Reports() {
             <Table>
               <TableHeader className="bg-slate-950/60 border-b border-slate-800">
                 <TableRow className="hover:bg-transparent">
-                  <TableHead className="pl-6 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Report</TableHead>
-                  <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Severity</TableHead>
-                  <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Status</TableHead>
-                  <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Ward</TableHead>
-                  <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Reported</TableHead>
-                  <TableHead className="pr-6 text-[11px] font-semibold text-slate-500 uppercase tracking-wider text-right">Upvotes</TableHead>
+                  <TableHead className="pl-6 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Report</TableHead>
+                  <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Severity</TableHead>
+                  <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</TableHead>
+                  <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ward</TableHead>
+                  <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Reported</TableHead>
+                  <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right pr-6">Upvotes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -144,48 +149,50 @@ export default function Reports() {
                     </TableRow>
                   ))
                 ) : filteredReports && filteredReports.length > 0 ? (
-                  filteredReports.map((report: Report) => (
-                    <TableRow
-                      key={report.id}
-                      className="border-slate-800/60 hover:bg-slate-800/40 transition-colors cursor-pointer group"
-                      onClick={() => (window.location.href = `/reports/${report.id}`)}
-                    >
-                      <TableCell className="pl-6 py-4">
-                        <div className="font-semibold text-sm text-slate-200 group-hover:text-cyan-300 transition-colors leading-snug">
-                          {report.title}
-                        </div>
-                        <div className="text-[10px] text-slate-600 mt-0.5 font-mono">
-                          #{report.id.toString().padStart(5, "0")}
-                        </div>
-                      </TableCell>
-                      <TableCell><SeverityBadge severity={report.severity} /></TableCell>
-                      <TableCell><StatusDot status={report.status} /></TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5 text-sm text-slate-400">
-                          <MapPin className="w-3 h-3 text-slate-600 flex-shrink-0" />
-                          {report.ward}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-xs text-slate-500">
-                        {format(new Date(report.createdAt), "MMM d, yyyy")}
-                      </TableCell>
-                      <TableCell className="pr-6">
-                        <div className="flex items-center justify-end gap-2">
-                          <span className="text-xs font-bold text-slate-400 tabular-nums">{report.upvotes}</span>
-                          <Link href={`/reports/${report.id}`}>
-                            <div className="w-7 h-7 rounded-lg bg-slate-800 text-slate-400 hover:bg-cyan-600 hover:text-white transition-colors flex items-center justify-center">
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </div>
-                          </Link>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  filteredReports.map((report: Report, idx) => (
+                      <motion.tr
+                        key={report.id}
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2, delay: Math.min(idx * 0.04, 0.6) }}
+                        className="border-slate-800/60 hover:bg-slate-800/40 transition-colors cursor-pointer group"
+                        onClick={() => (window.location.href = `/reports/${report.id}`)}
+                      >
+                        <TableCell className="pl-6 py-4">
+                          <div className="font-semibold text-sm text-slate-200 group-hover:text-cyan-300 transition-colors leading-snug">
+                            {report.title}
+                          </div>
+                          <div className="text-[10px] text-slate-600 mt-0.5 font-mono">
+                            #{report.id.toString().padStart(5, "0")}
+                          </div>
+                        </TableCell>
+                        <TableCell><SeverityBadge severity={report.severity} /></TableCell>
+                        <TableCell><StatusDot status={report.status} /></TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5 text-sm text-slate-400">
+                            <MapPin className="w-3 h-3 text-slate-600 flex-shrink-0" />{report.ward}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-500">{format(new Date(report.createdAt), "MMM d, yyyy")}</TableCell>
+                        <TableCell className="pr-6">
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="text-xs font-bold text-slate-400 tabular-nums flex items-center gap-1">
+                              <ThumbsUp className="w-3 h-3 text-slate-600" />{report.upvotes}
+                            </span>
+                            <Link href={`/reports/${report.id}`}>
+                              <div className="w-7 h-7 rounded-lg bg-slate-800 text-slate-400 hover:bg-cyan-600 hover:text-white transition-colors flex items-center justify-center">
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              </div>
+                            </Link>
+                          </div>
+                        </TableCell>
+                      </motion.tr>
+                    ))
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-16">
                       <FileX className="w-10 h-10 text-slate-700 mx-auto mb-3" />
-                      <p className="text-slate-400 font-medium">No reports match your filters</p>
+                      <p className="text-slate-400 font-semibold">No reports match your filters</p>
                       <p className="text-slate-600 text-sm mt-1">Try adjusting the search or filter criteria</p>
                     </TableCell>
                   </TableRow>
