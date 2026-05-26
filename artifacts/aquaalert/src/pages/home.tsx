@@ -110,9 +110,9 @@ export default function Home() {
                 </div>
               ))}
             </div>
-          ) : recentActivity && recentActivity.length > 0 ? (
+          ) : recentActivity && recentActivity.filter(r => r.status !== "resolved" && r.status !== "rejected").length > 0 ? (
             <motion.div variants={feedVariants} initial="hidden" animate="visible" className="space-y-2">
-              {recentActivity.map((report) => {
+              {recentActivity.filter(r => r.status !== "resolved" && r.status !== "rejected").map((report) => {
                 const color = SEVERITY_COLORS[report.severity as keyof typeof SEVERITY_COLORS];
                 return (
                   <motion.div key={report.id} variants={feedItem}>

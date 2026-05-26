@@ -127,6 +127,9 @@ router.get("/analytics/recent-activity", async (req, res): Promise<void> => {
   const rows = await db
     .select()
     .from(reportsTable)
+    .where(
+      sql`status NOT IN ('resolved', 'rejected')`
+    )
     .orderBy(desc(reportsTable.createdAt))
     .limit(parsed.data.limit ?? 10);
 

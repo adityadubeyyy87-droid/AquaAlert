@@ -53,7 +53,7 @@ export default function LiveMap({ reports, center = [19.076, 72.877], zoom = 12 
         />
         <MapUpdater center={center} />
 
-        {reports.map((report) => {
+        {reports.filter(r => r.status !== "resolved" && r.status !== "rejected").map((report) => {
           const color = SEVERITY_COLORS[report.severity as keyof typeof SEVERITY_COLORS] || SEVERITY_COLORS.low;
           const statusColor = STATUS_COLORS[report.status as keyof typeof STATUS_COLORS];
 

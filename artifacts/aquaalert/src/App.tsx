@@ -12,6 +12,7 @@ import Dashboard from "@/pages/dashboard";
 import Leaderboard from "@/pages/leaderboard";
 import Reports from "@/pages/reports/index";
 import ReportDetail from "@/pages/reports/detail";
+import AdminPage from "@/pages/admin";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchInterval: 60_000 } },
@@ -42,6 +43,7 @@ function AnimatedRoutes() {
           <Route path="/leaderboard" component={Leaderboard} />
           <Route path="/reports" component={Reports} />
           <Route path="/reports/:id" component={ReportDetail} />
+          <Route path="/admin" component={AdminPage} />
           <Route component={NotFound} />
         </Switch>
       </motion.div>

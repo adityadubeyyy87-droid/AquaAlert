@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Droplet, Activity, Map, Trophy, List, PlusCircle, Radio, Clock } from "lucide-react";
+import { Droplet, Activity, Map, Trophy, List, PlusCircle, Radio, Clock, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -61,6 +61,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { href: "/dashboard",   label: "Dashboard",   icon: Activity, desc: "Command center" },
     { href: "/reports",     label: "All Reports", icon: List,     desc: "Report directory" },
     { href: "/leaderboard", label: "Leaderboard", icon: Trophy,   desc: "Civic champions" },
+    { href: "/admin",       label: "Municipality", icon: Shield,   desc: "Admin portal" },
   ];
 
   return (
