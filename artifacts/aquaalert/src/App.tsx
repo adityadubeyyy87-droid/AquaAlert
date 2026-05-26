@@ -6,12 +6,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import AppLayout from "@/components/layout/AppLayout";
 import NotFound from "@/pages/not-found";
 
-import Home from "@/pages/home";
-import Report from "@/pages/report";
+import Home        from "@/pages/home";
+import Report      from "@/pages/report";
 import Leaderboard from "@/pages/leaderboard";
-import Reports from "@/pages/reports/index";
+import Reports     from "@/pages/reports/index";
 import ReportDetail from "@/pages/reports/detail";
-import AdminPage from "@/pages/admin";
+import AdminPage   from "@/pages/admin";
+import MyReports   from "@/pages/my-reports";
+import HowItWorks  from "@/pages/how-it-works";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, refetchInterval: 60_000 } },
@@ -36,13 +38,15 @@ function AnimatedRoutes() {
         style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column" }}
       >
         <Switch>
-          <Route path="/" component={Home} />
-          <Route path="/report" component={Report} />
+          <Route path="/"              component={Home} />
+          <Route path="/report"        component={Report} />
+          <Route path="/leaderboard"   component={Leaderboard} />
+          <Route path="/reports"       component={Reports} />
+          <Route path="/reports/:id"   component={ReportDetail} />
+          <Route path="/admin"         component={AdminPage} />
+          <Route path="/my-reports"    component={MyReports} />
+          <Route path="/how-it-works"  component={HowItWorks} />
           <Route path="/dashboard">{() => { window.location.replace("/admin"); return null; }}</Route>
-          <Route path="/leaderboard" component={Leaderboard} />
-          <Route path="/reports" component={Reports} />
-          <Route path="/reports/:id" component={ReportDetail} />
-          <Route path="/admin" component={AdminPage} />
           <Route component={NotFound} />
         </Switch>
       </motion.div>

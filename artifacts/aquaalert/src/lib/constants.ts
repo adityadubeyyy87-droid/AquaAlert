@@ -14,25 +14,33 @@ export const STATUS_COLORS = {
 } as const;
 
 export function getBadgeTier(points: number) {
-  if (points >= 350) return "Platinum";
-  if (points >= 150) return "Gold";
-  if (points >= 50)  return "Silver";
-  return "Bronze";
+  if (points >= 350) return "Champion";
+  if (points >= 150) return "Hero";
+  if (points >= 50)  return "Guardian";
+  return "Newcomer";
 }
 
 export function getBadgeColor(tier: string) {
   switch (tier.toLowerCase()) {
-    case "platinum": return "bg-cyan-300 text-cyan-950";
-    case "gold":     return "bg-yellow-400 text-yellow-950";
-    case "silver":   return "bg-slate-300 text-slate-900";
-    case "bronze":   return "bg-amber-700 text-amber-50";
+    case "champion": return "bg-yellow-400 text-yellow-950";
+    case "hero":     return "bg-indigo-500 text-indigo-50";
+    case "guardian": return "bg-emerald-600 text-emerald-50";
+    case "newcomer": return "bg-slate-700 text-slate-200";
     default:         return "bg-slate-800 text-slate-300";
   }
 }
 
 export function getNextTierInfo(points: number): { tier: string; needed: number; pct: number } {
-  if (points < 50)  return { tier: "Silver",   needed: 50 - points,  pct: Math.round((points / 50) * 100) };
-  if (points < 150) return { tier: "Gold",     needed: 150 - points, pct: Math.round(((points - 50) / 100) * 100) };
-  if (points < 350) return { tier: "Platinum", needed: 350 - points, pct: Math.round(((points - 150) / 200) * 100) };
+  if (points < 50)  return { tier: "Guardian", needed: 50 - points,  pct: Math.round((points / 50) * 100) };
+  if (points < 150) return { tier: "Hero",     needed: 150 - points, pct: Math.round(((points - 50) / 100) * 100) };
+  if (points < 350) return { tier: "Champion", needed: 350 - points, pct: Math.round(((points - 150) / 200) * 100) };
   return { tier: "Max", needed: 0, pct: 100 };
 }
+
+export const MUMBAI_WARDS = [
+  "Andheri West", "Andheri East", "Bandra West", "Bandra East",
+  "Juhu", "Dadar", "Powai", "Borivali", "Malad West", "Malad East",
+  "Kandivali East", "Kandivali West", "Worli", "Chembur", "Kurla",
+  "Ghatkopar", "Santacruz East", "Santacruz West", "Goregaon East",
+  "Goregaon West", "Vikhroli", "Mulund", "Bhandup", "Khar",
+] as const;

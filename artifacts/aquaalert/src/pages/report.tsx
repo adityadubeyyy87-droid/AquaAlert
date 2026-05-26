@@ -117,6 +117,9 @@ export default function Report() {
 
   const onSubmit = (data: FormValues) => {
     if (!position) { toast({ title: "Location required", variant: "destructive" }); return; }
+    if (data.reporterName) {
+      localStorage.setItem("aquaalert_reporter_name", data.reporterName);
+    }
     createReport.mutate(
       { data: { ...data, severity: data.severity as ReportInputSeverity, latitude: position[0], longitude: position[1], imageUrl: null } },
       {

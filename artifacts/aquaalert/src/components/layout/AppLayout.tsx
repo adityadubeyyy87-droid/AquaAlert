@@ -1,5 +1,8 @@
 import { Link, useLocation } from "wouter";
-import { Droplet, Map, Trophy, List, PlusCircle, Radio, Clock, Shield } from "lucide-react";
+import {
+  Droplet, Map, Trophy, List, PlusCircle, Radio, Clock, Shield,
+  User, HelpCircle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -11,12 +14,8 @@ function LiveClock() {
     const t = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
-  const ist = time.toLocaleTimeString("en-IN", {
-    timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-  });
-  const date = time.toLocaleDateString("en-IN", {
-    timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric",
-  });
+  const ist  = time.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  const date = time.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" });
   return (
     <div className="mx-4 mb-4 px-3 py-2.5 rounded-xl bg-slate-950/60 border border-slate-800/60">
       <div className="flex items-center gap-2 mb-0.5">
@@ -43,34 +42,65 @@ function ImpactTicker() {
   );
 }
 
-const sidebarVariants = {
-  hidden: { x: -20, opacity: 0 },
-  visible: { x: 0, opacity: 1, transition: { duration: 0.35, ease: [0.4, 0, 0.2, 1] } },
-};
+const PUBLIC_NAV = [
+  { href: "/",              label: "Live Map",       icon: Map,        desc: "Real-time pins"     },
+  { href: "/reports",       label: "All Reports",    icon: List,       desc: "Report directory"   },
+  { href: "/leaderboard",   label: "Leaderboard",    icon: Trophy,     desc: "Civic champions"    },
+  { href: "/my-reports",    label: "My Reports",     icon: User,       desc: "Your submissions"   },
+  { href: "/how-it-works",  label: "How It Works",   icon: HelpCircle, desc: "3-step guide"       },
+];
 
-const navItemVariants = {
-  hidden: { x: -12, opacity: 0 },
-  visible: (i: number) => ({ x: 0, opacity: 1, transition: { delay: i * 0.06, duration: 0.25 } }),
-};
+const ADMIN_NAV = [
+  { href: "/admin", label: "Municipality", icon: Shield, desc: "Command center" },
+];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
 
-  const navItems = [
-    { href: "/",            label: "Live Map",    icon: Map,      desc: "Real-time pins" },
-    { href: "/reports",     label: "All Reports", icon: List,     desc: "Report directory" },
-    { href: "/leaderboard", label: "Leaderboard", icon: Trophy,   desc: "Civic champions" },
-    { href: "/admin",       label: "Municipality", icon: Shield,   desc: "Command center" },
-  ];
+  const isActive = (href: string) =>
+    href === "/" ? location === "/" : location === href || location.startsWith(href + "/");
+
+  const NavItem = ({ item, i }: { item: typeof PUBLIC_NAV[0]; i: number }) => {
+    const active = isActive(item.href);
+    return (
+      <motion.div
+        custom={i}
+        initial={{ x: -12, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ delay: i * 0.05, duration: 0.22 }}
+      >
+        <Link href={item.href}>
+          <div className={cn(
+            "relative flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer group border",
+            active
+              ? "bg-cyan-950/50 text-cyan-300 border-cyan-900/60 shadow-[0_0_20px_rgba(6,182,212,0.1)]"
+              : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 border-transparent"
+          )}>
+            {active && (
+              <motion.span layoutId="nav-indicator"
+                className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-cyan-400 rounded-r-full" />
+            )}
+            <item.icon className={cn("w-4 h-4 mr-3 flex-shrink-0 transition-colors", active ? "text-cyan-400" : "text-slate-500 group-hover:text-slate-300")} />
+            <div>
+              <div className="leading-none">{item.label}</div>
+              <div className={cn("text-[10px] font-normal leading-none mt-0.5", active ? "text-cyan-600" : "text-slate-600 group-hover:text-slate-500")}>
+                {item.desc}
+              </div>
+            </div>
+          </div>
+        </Link>
+      </motion.div>
+    );
+  };
 
   return (
     <div className="flex h-screen w-full bg-slate-950 text-slate-50 overflow-hidden font-sans">
       {/* Sidebar */}
       <motion.aside
-        variants={sidebarVariants}
-        initial="hidden"
-        animate="visible"
-        className="w-64 border-r border-slate-800 bg-slate-900/60 flex flex-col backdrop-blur-md relative z-20 shrink-0"
+        initial={{ x: -20, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
+        className="w-60 border-r border-slate-800 bg-slate-900/60 flex flex-col backdrop-blur-md relative z-20 shrink-0"
       >
         {/* Logo */}
         <div className="h-16 flex items-center px-5 border-b border-slate-800 gap-3">
@@ -78,9 +108,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Droplet className="w-4 h-4 text-cyan-400" />
           </div>
           <div>
-            <span className="font-bold text-lg tracking-tight text-slate-100">
-              Aqua<span className="text-cyan-400">Alert</span>
-            </span>
+            <span className="font-bold text-lg tracking-tight text-slate-100">Aqua<span className="text-cyan-400">Alert</span></span>
             <div className="text-[9px] text-slate-600 font-medium tracking-widest uppercase -mt-0.5">Mumbai Water Grid</div>
           </div>
         </div>
@@ -95,53 +123,26 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Radio className="w-3 h-3 text-green-500 ml-auto" />
         </div>
 
-        {/* Clock */}
         <LiveClock />
 
-        {/* Nav */}
-        <nav className="flex-1 px-3 space-y-0.5">
-          {navItems.map((item, i) => {
-            const isActive = location === item.href || (item.href !== "/" && location.startsWith(item.href));
-            return (
-              <motion.div key={item.href} custom={i} variants={navItemVariants} initial="hidden" animate="visible">
-                <Link href={item.href}>
-                  <div className={cn(
-                    "relative flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer group border",
-                    isActive
-                      ? "bg-cyan-950/50 text-cyan-300 border-cyan-900/60 shadow-[0_0_20px_rgba(6,182,212,0.1)]"
-                      : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 border-transparent"
-                  )}>
-                    {isActive && (
-                      <motion.span
-                        layoutId="nav-indicator"
-                        className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-cyan-400 rounded-r-full"
-                      />
-                    )}
-                    <item.icon className={cn("w-4 h-4 mr-3 flex-shrink-0 transition-colors", isActive ? "text-cyan-400" : "text-slate-500 group-hover:text-slate-300")} />
-                    <div>
-                      <div className="leading-none">{item.label}</div>
-                      <div className={cn("text-[10px] font-normal leading-none mt-0.5", isActive ? "text-cyan-600" : "text-slate-600 group-hover:text-slate-500")}>
-                        {item.desc}
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-            );
-          })}
+        {/* Public nav */}
+        <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
+          {PUBLIC_NAV.map((item, i) => <NavItem key={item.href} item={item} i={i} />)}
+
+          {/* Divider */}
+          <div className="my-2 mx-2 border-t border-slate-800/60" />
+
+          {/* Admin nav */}
+          {ADMIN_NAV.map((item, i) => <NavItem key={item.href} item={item} i={PUBLIC_NAV.length + 1 + i} />)}
         </nav>
 
-        {/* Impact ticker */}
         <ImpactTicker />
 
         {/* CTA */}
         <div className="p-4 border-t border-slate-800">
           <Link href="/report">
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="flex items-center justify-center w-full bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_28px_rgba(6,182,212,0.5)] cursor-pointer gap-2"
-            >
+            <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              className="flex items-center justify-center w-full bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_28px_rgba(6,182,212,0.5)] cursor-pointer gap-2">
               <PlusCircle className="w-4 h-4" />
               Report a Leak
             </motion.div>
@@ -151,9 +152,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </motion.aside>
 
       {/* Main */}
-      <main className="flex-1 relative overflow-hidden bg-slate-950">
-        {children}
-      </main>
+      <main className="flex-1 relative overflow-hidden bg-slate-950">{children}</main>
     </div>
   );
 }
