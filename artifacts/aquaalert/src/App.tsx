@@ -8,7 +8,6 @@ import NotFound from "@/pages/not-found";
 
 import Home from "@/pages/home";
 import Report from "@/pages/report";
-import Dashboard from "@/pages/dashboard";
 import Leaderboard from "@/pages/leaderboard";
 import Reports from "@/pages/reports/index";
 import ReportDetail from "@/pages/reports/detail";
@@ -39,7 +38,7 @@ function AnimatedRoutes() {
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/report" component={Report} />
-          <Route path="/dashboard" component={Dashboard} />
+          <Route path="/dashboard">{() => { window.location.replace("/admin"); return null; }}</Route>
           <Route path="/leaderboard" component={Leaderboard} />
           <Route path="/reports" component={Reports} />
           <Route path="/reports/:id" component={ReportDetail} />

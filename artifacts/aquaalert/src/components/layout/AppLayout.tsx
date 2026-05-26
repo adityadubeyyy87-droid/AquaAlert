@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Droplet, Activity, Map, Trophy, List, PlusCircle, Radio, Clock, Shield } from "lucide-react";
+import { Droplet, Map, Trophy, List, PlusCircle, Radio, Clock, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
@@ -58,10 +58,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: "/",            label: "Live Map",    icon: Map,      desc: "Real-time pins" },
-    { href: "/dashboard",   label: "Dashboard",   icon: Activity, desc: "Command center" },
     { href: "/reports",     label: "All Reports", icon: List,     desc: "Report directory" },
     { href: "/leaderboard", label: "Leaderboard", icon: Trophy,   desc: "Civic champions" },
-    { href: "/admin",       label: "Municipality", icon: Shield,   desc: "Admin portal" },
+    { href: "/admin",       label: "Municipality", icon: Shield,   desc: "Command center" },
   ];
 
   return (
