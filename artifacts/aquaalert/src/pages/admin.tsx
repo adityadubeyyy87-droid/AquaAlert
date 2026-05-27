@@ -1,10 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   useListReports, useUpdateReport, useGetDashboardSummary, useListWards, useListUsers,
-  useGetSeverityBreakdown, useGetStatusBreakdown,
+  useGetSeverityBreakdown, useGetStatusBreakdown, useGetRecentActivity,
   Report, ReportUpdateStatus,
   getListReportsQueryKey, getGetDashboardSummaryQueryKey, getGetRecentActivityQueryKey,
-  getGetSeverityBreakdownQueryKey, getGetStatusBreakdownQueryKey,
+  getGetSeverityBreakdownQueryKey, getGetStatusBreakdownQueryKey, getListWardsQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -27,8 +27,9 @@ import {
 import {
   Shield, LogOut, Droplet, AlertCircle, CheckCircle2, Clock, MapPin, Search,
   RefreshCw, ChevronDown, Activity, Zap, Droplets, AlertTriangle, CheckCircle,
-  TrendingUp, Minus, List, BarChart2, Trophy, Download, Thermometer,
+  TrendingUp, List, BarChart2, Trophy, Download, Thermometer,
   ChevronUp, Star, Flame, Phone, Mail, Users, BookOpen, Building2,
+  Radio, ArrowUpRight,
 } from "lucide-react";
 
 const ADMIN_ID       = "Aditya@1234";
@@ -44,16 +45,16 @@ const CHART_STYLE = {
 };
 
 const TABS = [
-  { key: "overview",    label: "Overview",     icon: BarChart2  },
-  { key: "reports",     label: "All Reports",   icon: List       },
-  { key: "heatmap",    label: "Heatmap",        icon: Thermometer },
-  { key: "leaderboard", label: "Leaderboard",   icon: Trophy     },
-  { key: "directory",  label: "Directory",      icon: BookOpen   },
-  { key: "export",     label: "Export",         icon: Download   },
+  { key: "overview",    label: "Overview",      icon: BarChart2   },
+  { key: "reports",     label: "All Reports",   icon: List        },
+  { key: "heatmap",     label: "Heatmap",       icon: Thermometer },
+  { key: "leaderboard", label: "Leaderboard",   icon: Trophy      },
+  { key: "directory",   label: "Directory",     icon: BookOpen    },
+  { key: "export",      label: "Export CSV",    icon: Download    },
 ] as const;
 type Tab = typeof TABS[number]["key"];
 
-function fmt(s: string) { return s.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase()); }
+function fmt(s: string) { return s.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase()); }
 
 function AnimatedStat({ value, suffix = "" }: { value: number; suffix?: string }) {
   const animated = useCountUp(value);
@@ -121,7 +122,6 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
             AquaAlert Water Leak Management System
           </div>
         </div>
-
         <Card className="bg-slate-900 border-slate-800 shadow-2xl">
           <CardContent className="p-8">
             <form onSubmit={handleSubmit} className="space-y-5">
@@ -141,12 +141,9 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
               </div>
               <AnimatePresence>
                 {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -6, height: 0 }}
-                    animate={{ opacity: 1, y: 0, height: "auto" }}
+                  <motion.div initial={{ opacity: 0, y: -6, height: 0 }} animate={{ opacity: 1, y: 0, height: "auto" }}
                     exit={{ opacity: 0, y: -6, height: 0 }}
-                    className="flex items-center gap-2 px-3 py-2.5 bg-red-950/40 border border-red-900/50 rounded-xl text-sm text-red-400"
-                  >
+                    className="flex items-center gap-2 px-3 py-2.5 bg-red-950/40 border border-red-900/50 rounded-xl text-sm text-red-400">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />{error}
                   </motion.div>
                 )}
@@ -166,14 +163,205 @@ function LoginScreen({ onLogin }: { onLogin: () => void }) {
   );
 }
 
+// ── LIVE FEED PANEL ───────────────────────────────────────────────────────────
+
+function LiveFeedPanel() {
+  const { data: activity, isLoading, dataUpdatedAt } = useGetRecentActivity(
+    { limit: 40 },
+    { query: { refetchInterval: 15_000 } }
+  );
+  const { data: reports } = useListReports(undefined, { query: { refetchInterval: 15_000 } });
+
+  const feedRef      = useRef<HTMLDivElement>(null);
+  const prevCount    = useRef(0);
+  const [newCount, setNewCount] = useState(0);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
+
+  // Detect new arrivals and flash the counter
+  useEffect(() => {
+    if (!activity) return;
+    const curr = activity.length;
+    if (prevCount.current > 0 && curr > prevCount.current) {
+      setNewCount(curr - prevCount.current);
+      setTimeout(() => setNewCount(0), 4000);
+    }
+    prevCount.current = curr;
+    setLastRefresh(new Date());
+  }, [activity]);
+
+  // Merge: all reports sorted newest-first
+  const feed = useMemo(() => {
+    const base = activity ?? [];
+    return [...base].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [activity]);
+
+  // Count by status from live reports
+  const statusCounts = useMemo(() => {
+    const all = reports ?? [];
+    return {
+      pending:     all.filter(r => r.status === "pending").length,
+      in_progress: all.filter(r => r.status === "in_progress").length,
+      resolved:    all.filter(r => r.status === "resolved").length,
+    };
+  }, [reports]);
+
+  return (
+    <div className="flex flex-col h-full bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+      {/* Header */}
+      <div className="px-5 py-4 border-b border-slate-800 flex-shrink-0">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+            </span>
+            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+              <Radio className="w-3.5 h-3.5 text-cyan-400" />
+              Live Feed
+            </h3>
+          </div>
+          <div className="flex items-center gap-2">
+            {newCount > 0 && (
+              <motion.span
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                className="text-[10px] font-bold bg-cyan-600 text-white px-2 py-0.5 rounded-full"
+              >
+                +{newCount} new
+              </motion.span>
+            )}
+            <span className="text-[10px] font-semibold bg-cyan-950/60 text-cyan-400 border border-cyan-900/50 px-2 py-0.5 rounded-full">
+              {feed.length} total
+            </span>
+          </div>
+        </div>
+
+        {/* Live status counters */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: "Pending",     count: statusCounts.pending,     color: "#f59e0b" },
+            { label: "In Progress", count: statusCounts.in_progress, color: "#3b82f6" },
+            { label: "Resolved",    count: statusCounts.resolved,    color: "#22c55e" },
+          ].map(({ label, count, color }) => (
+            <div key={label} className="text-center px-2 py-1.5 rounded-xl bg-slate-950/60 border border-slate-800/60">
+              <div className="text-base font-black tabular-nums" style={{ color }}>{count}</div>
+              <div className="text-[9px] text-slate-600 leading-none mt-0.5">{label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Refresh indicator */}
+        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-600">
+          <RefreshCw className="w-3 h-3" />
+          Auto-refreshes every 15 s · Last: {format(lastRefresh, "HH:mm:ss")}
+        </div>
+      </div>
+
+      {/* Feed items */}
+      <div ref={feedRef} className="flex-1 overflow-y-auto p-3 space-y-2">
+        {isLoading ? (
+          Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="p-3 rounded-xl border border-slate-800 flex gap-3">
+              <Skeleton className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" />
+              <div className="space-y-2 flex-1">
+                <Skeleton className="h-3.5 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+              </div>
+            </div>
+          ))
+        ) : feed.length === 0 ? (
+          <div className="text-center py-16 text-slate-600">
+            <Radio className="w-8 h-8 mx-auto mb-3 opacity-20" />
+            <p className="text-sm text-slate-500">No reports yet</p>
+          </div>
+        ) : (
+          feed.map((report, i) => {
+            const sevColor  = SEVERITY_COLORS[report.severity as keyof typeof SEVERITY_COLORS];
+            const statColor = STATUS_COLORS[report.status as keyof typeof STATUS_COLORS];
+            const isCrit    = report.severity === "critical" && report.status !== "resolved";
+            return (
+              <motion.div
+                key={report.id}
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: Math.min(i * 0.025, 0.5), duration: 0.2 }}
+                className={`p-3 rounded-xl border transition-colors ${
+                  isCrit
+                    ? "border-red-900/40 bg-red-950/10"
+                    : report.status === "resolved"
+                    ? "border-green-900/30 bg-green-950/8"
+                    : "border-slate-800/60 bg-slate-950/40"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5" style={{
+                      backgroundColor: sevColor,
+                      boxShadow: isCrit ? `0 0 6px ${sevColor}` : undefined,
+                    }} />
+                    <h4 className="text-[13px] font-semibold text-slate-200 truncate leading-snug">
+                      {report.title}
+                    </h4>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-600 flex-shrink-0">#{report.id.toString().padStart(4, "0")}</span>
+                </div>
+
+                <div className="flex items-center justify-between pl-3.5 mb-1.5">
+                  <div className="flex items-center text-[11px] text-slate-500 gap-1">
+                    <MapPin className="w-3 h-3" /><span className="truncate">{report.ward}</span>
+                  </div>
+                  <span className="text-[10px] text-slate-600 flex-shrink-0">
+                    {formatDistanceToNow(new Date(report.createdAt), { addSuffix: true })}
+                  </span>
+                </div>
+
+                <div className="pl-3.5 flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 font-bold flex-shrink-0"
+                    style={{ color: sevColor, borderColor: `${sevColor}40` }}>
+                    {report.severity.toUpperCase()}
+                  </Badge>
+                  <span className="text-[10px] flex items-center gap-1 flex-shrink-0" style={{ color: statColor }}>
+                    <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: statColor }} />
+                    {fmt(report.status)}
+                  </span>
+                  {report.reporterName && (
+                    <span className="text-[10px] text-slate-600 truncate">by {report.reporterName}</span>
+                  )}
+                  <span className="text-[10px] text-slate-700 ml-auto flex-shrink-0">▲ {report.upvotes}</span>
+                </div>
+              </motion.div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── TAB: OVERVIEW ─────────────────────────────────────────────────────────────
 
 function OverviewTab() {
-  const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary();
-  const { data: wards, isLoading: isWardsLoading } = useListWards();
-  const { data: severityStats } = useGetSeverityBreakdown();
-  const { data: statusStats } = useGetStatusBreakdown();
-  const { data: allReports } = useListReports();
+  const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary(
+    undefined,
+    { query: { refetchInterval: 15_000 } }
+  );
+  const { data: wards, isLoading: isWardsLoading } = useListWards(
+    undefined,
+    { query: { refetchInterval: 15_000 } }
+  );
+  const { data: severityStats } = useGetSeverityBreakdown(
+    undefined,
+    { query: { refetchInterval: 15_000 } }
+  );
+  const { data: statusStats } = useGetStatusBreakdown(
+    undefined,
+    { query: { refetchInterval: 15_000 } }
+  );
+  const { data: allReports } = useListReports(
+    undefined,
+    { query: { refetchInterval: 15_000 } }
+  );
 
   const trendData = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const d = subDays(new Date(), 6 - i);
@@ -202,246 +390,193 @@ function OverviewTab() {
   const sk = <Skeleton className="h-10 w-16" />;
 
   const statCards = [
-    {
-      title: "Total Reports",
-      value: summary?.totalReports,
-      icon: Activity,
-      colorClass: "bg-slate-800/80 text-slate-300",
-      tag: "All submitted reports",
-      note: null,
-    },
-    {
-      title: "Pending",
-      value: summary?.pendingReports,
-      icon: Clock,
-      colorClass: "bg-amber-950/60 text-amber-400",
-      tag: "Awaiting action",
-      note: null,
-    },
-    {
-      title: "In Progress",
-      value: summary?.inProgressReports,
-      icon: Droplets,
-      colorClass: "bg-blue-950/60 text-blue-400",
-      tag: "Field teams dispatched",
-      note: null,
-    },
-    {
-      title: "Resolved Today",
-      value: summary?.resolvedToday,
-      icon: CheckCircle,
-      colorClass: "bg-green-950/60 text-green-400",
-      tag: format(new Date(), "d MMM yyyy"),
-      note: null,
-    },
-    {
-      title: "Avg Resolution",
-      value: summary?.avgResolutionHours,
-      icon: TrendingUp,
-      colorClass: "bg-purple-950/60 text-purple-400",
-      tag: summary?.resolvedReports ? `across ${summary.resolvedReports} resolved` : "No resolved reports yet",
-      suffix: "h",
-      note: null,
-    },
-    {
-      title: "Critical Active",
-      value: summary?.criticalReports,
-      icon: AlertTriangle,
-      colorClass: "bg-red-950/60 text-red-400",
-      tag: "Immediate dispatch needed",
-      note: (summary?.criticalReports ?? 0) > 0 ? "urgent" : null,
-    },
+    { title: "Total Reports",   value: summary?.totalReports,        icon: Activity,      color: "text-slate-300",  bg: "bg-slate-800/80",    tag: "All submitted" },
+    { title: "Pending",         value: summary?.pendingReports,      icon: Clock,         color: "text-amber-400",  bg: "bg-amber-950/60",    tag: "Awaiting action" },
+    { title: "In Progress",     value: summary?.inProgressReports,   icon: Droplets,      color: "text-blue-400",   bg: "bg-blue-950/60",     tag: "Teams dispatched" },
+    { title: "Resolved Today",  value: summary?.resolvedToday,       icon: CheckCircle,   color: "text-green-400",  bg: "bg-green-950/60",    tag: format(new Date(), "d MMM") },
+    { title: "Avg Resolution",  value: summary?.avgResolutionHours,  icon: TrendingUp,    color: "text-purple-400", bg: "bg-purple-950/60",   tag: "hours per report", suffix: "h" },
+    { title: "Critical Active", value: summary?.criticalReports,     icon: AlertTriangle, color: "text-red-400",    bg: "bg-red-950/60",      tag: "Immediate dispatch", urgent: true },
   ];
 
   const cv = {
     hidden: { opacity: 0, y: 14 },
-    visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.07, duration: 0.28 } }),
+    visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.06, duration: 0.25 } }),
   };
 
   return (
-    <div className="space-y-7">
-
-      {/* Live data note */}
-      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-800 w-fit text-xs text-slate-500">
-        <span className="relative flex h-1.5 w-1.5">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
-        </span>
-        All numbers are computed live from actual report data · Auto-refreshes every 60 s
-      </div>
-
-      {/* Primary stat cards — 3 columns on desktop */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        {statCards.map((s, i) => (
-          <motion.div key={s.title} custom={i} variants={cv} initial="hidden" animate="visible">
-            <Card className={`bg-slate-900 border-slate-800 relative overflow-hidden h-full ${s.note === "urgent" ? "border-red-900/60 shadow-[0_0_20px_rgba(239,68,68,0.08)]" : ""}`}>
-              {s.note === "urgent" && (
-                <span className="absolute top-3 right-3 flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-                </span>
-              )}
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between mb-3">
-                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-tight">{s.title}</p>
-                  <div className={`p-2.5 rounded-xl flex-shrink-0 ${s.colorClass}`}>
-                    <s.icon className="w-3.5 h-3.5" />
+    <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-6 h-full">
+      {/* ── Left: analytics column ── */}
+      <div className="space-y-6 min-w-0">
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          {statCards.map((s, i) => (
+            <motion.div key={s.title} custom={i} variants={cv} initial="hidden" animate="visible">
+              <Card className={`bg-slate-900 border-slate-800 relative overflow-hidden h-full ${s.urgent ? "border-red-900/60 shadow-[0_0_20px_rgba(239,68,68,0.08)]" : ""}`}>
+                {s.urgent && (summary?.criticalReports ?? 0) > 0 && (
+                  <span className="absolute top-3 right-3 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                  </span>
+                )}
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-tight">{s.title}</p>
+                    <div className={`p-2 rounded-xl flex-shrink-0 ${s.bg} ${s.color}`}>
+                      <s.icon className="w-3.5 h-3.5" />
+                    </div>
                   </div>
+                  <div className={`text-3xl font-black tabular-nums mb-1 ${s.color}`}>
+                    {isSummaryLoading || s.value === undefined ? sk : <AnimatedStat value={s.value} suffix={(s as any).suffix} />}
+                  </div>
+                  <p className="text-[10px] text-slate-600 mt-2 pt-2 border-t border-slate-800">{s.tag}</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* 7-day trend */}
+        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }}>
+          <Card className="bg-slate-900 border-slate-800">
+            <CardHeader className="border-b border-slate-800 py-4 px-6">
+              <CardTitle className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-cyan-400" /> 7-Day Report Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-6">
+              <div className="h-36">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trendData} margin={{ top: 0, right: 4, left: -24, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="rg" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.02} />
+                      </linearGradient>
+                      <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#ef4444" stopOpacity={0.4} />
+                        <stop offset="100%" stopColor="#ef4444" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                    <XAxis dataKey="day" stroke="#475569" fontSize={11} tickLine={false} axisLine={false} />
+                    <YAxis stroke="#475569" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
+                    <RechartsTooltip cursor={{ stroke: "#334155" }} contentStyle={CHART_STYLE} />
+                    <Area type="monotone" dataKey="reports" stroke="#06b6d4" strokeWidth={2} fill="url(#rg)" name="Reports" />
+                    <Area type="monotone" dataKey="critical" stroke="#ef4444" strokeWidth={1.5} fill="url(#cg)" name="Critical" strokeDasharray="4 2" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Ward table + breakdown charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="lg:col-span-2">
+            <Card className="bg-slate-900 border-slate-800">
+              <CardHeader className="border-b border-slate-800 py-4 px-5">
+                <CardTitle className="text-sm font-semibold text-slate-300">Ward-wise Distribution</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto max-h-[240px]">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-slate-900 z-10">
+                      <TableRow className="border-slate-800 hover:bg-transparent">
+                        <TableHead className="pl-5 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ward / Zone</TableHead>
+                        <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Pending</TableHead>
+                        <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Critical</TableHead>
+                        <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right pr-5">Resolved</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {isWardsLoading
+                        ? Array.from({ length: 5 }).map((_, i) => (
+                            <TableRow key={i} className="border-slate-800">
+                              <TableCell className="pl-5"><Skeleton className="h-4 w-28" /></TableCell>
+                              <TableCell><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                              <TableCell><Skeleton className="h-2 w-full rounded-full" /></TableCell>
+                              <TableCell className="pr-5"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                            </TableRow>
+                          ))
+                        : (wards ?? []).map(ward => (
+                            <TableRow key={ward.ward} className="border-slate-800 hover:bg-slate-800/30 transition-colors">
+                              <TableCell className="pl-5 font-semibold text-slate-200 text-xs">{ward.ward}</TableCell>
+                              <TableCell className="text-right font-bold text-amber-400 tabular-nums text-sm">{ward.pendingReports}</TableCell>
+                              <TableCell className="w-36">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                    <motion.div className="h-full bg-red-500 rounded-full"
+                                      initial={{ width: 0 }}
+                                      animate={{ width: `${(ward.criticalReports / maxWardCritical) * 100}%` }}
+                                      transition={{ duration: 0.8, ease: "easeOut", delay: 0.5 }} />
+                                  </div>
+                                  <span className="text-xs font-bold text-red-400 tabular-nums w-4 text-right">{ward.criticalReports}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="pr-5 text-right text-slate-400 tabular-nums text-sm">{ward.resolvedReports}</TableCell>
+                            </TableRow>
+                          ))}
+                    </TableBody>
+                  </Table>
                 </div>
-                <div className="text-4xl font-black text-slate-100 tabular-nums mb-1">
-                  {s.value === undefined ? sk : <AnimatedStat value={s.value} suffix={(s as any).suffix} />}
-                </div>
-                <p className="text-[11px] text-slate-600 mt-2 pt-2 border-t border-slate-800">{s.tag}</p>
               </CardContent>
             </Card>
           </motion.div>
-        ))}
+
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.54 }} className="space-y-4">
+            <Card className="bg-slate-900 border-slate-800">
+              <CardHeader className="border-b border-slate-800 py-3 px-4">
+                <CardTitle className="text-xs font-semibold text-slate-300">Severity</CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-4">
+                <div className="h-28">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={severityData} margin={{ top: 0, right: 4, left: -24, bottom: 0 }}>
+                      <XAxis dataKey="name" stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} allowDecimals={false} />
+                      <RechartsTooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} contentStyle={CHART_STYLE} />
+                      <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={32}>
+                        {severityData.map((e, i) => <Cell key={i} fill={e.color} fillOpacity={0.85} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-slate-900 border-slate-800">
+              <CardHeader className="border-b border-slate-800 py-3 px-4">
+                <CardTitle className="text-xs font-semibold text-slate-300">Status Split</CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 pt-4">
+                <div className="h-28">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={statusData} cx="40%" cy="50%" innerRadius={28} outerRadius={48} paddingAngle={3} dataKey="value" stroke="none">
+                        {statusData.map((e, i) => <Cell key={i} fill={e.color} fillOpacity={0.9} />)}
+                      </Pie>
+                      <Legend layout="vertical" align="right" verticalAlign="middle" iconType="circle" iconSize={6}
+                        formatter={v => <span className="text-[9px] text-slate-400">{v}</span>} />
+                      <RechartsTooltip contentStyle={CHART_STYLE} itemStyle={{ color: "#f1f5f9" }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
       </div>
 
-      {/* 7-day trend */}
-      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
-        <Card className="bg-slate-900 border-slate-800">
-          <CardHeader className="border-b border-slate-800 py-4 px-6">
-            <CardTitle className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-cyan-400" /> 7-Day Report Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 pt-6">
-            <div className="h-44">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trendData} margin={{ top: 0, right: 4, left: -24, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="rg" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.02} />
-                    </linearGradient>
-                    <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#ef4444" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#ef4444" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="day" stroke="#475569" fontSize={11} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#475569" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
-                  <RechartsTooltip cursor={{ stroke: "#334155" }} contentStyle={CHART_STYLE} />
-                  <Area type="monotone" dataKey="reports" stroke="#06b6d4" strokeWidth={2} fill="url(#rg)" name="Reports" />
-                  <Area type="monotone" dataKey="critical" stroke="#ef4444" strokeWidth={1.5} fill="url(#cg)" name="Critical" strokeDasharray="4 2" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+      {/* ── Right: Live Feed ── */}
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.35, delay: 0.15 }}
+        className="min-h-[600px] xl:min-h-0"
+        style={{ height: "calc(100vh - 140px)" }}
+      >
+        <LiveFeedPanel />
       </motion.div>
-
-      {/* Ward table + breakdown charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.52 }} className="lg:col-span-2">
-          <Card className="bg-slate-900 border-slate-800 h-full">
-            <CardHeader className="border-b border-slate-800 py-4 px-6">
-              <CardTitle className="text-sm font-semibold text-slate-300">Ward-wise Distribution</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto max-h-[320px]">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-slate-900 z-10">
-                    <TableRow className="border-slate-800 hover:bg-transparent">
-                      <TableHead className="pl-6 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ward / Zone</TableHead>
-                      <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Pending</TableHead>
-                      <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Critical</TableHead>
-                      <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right pr-6">Resolved</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isWardsLoading
-                      ? Array.from({ length: 6 }).map((_, i) => (
-                          <TableRow key={i} className="border-slate-800">
-                            <TableCell className="pl-6"><Skeleton className="h-4 w-28" /></TableCell>
-                            <TableCell><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
-                            <TableCell><Skeleton className="h-2 w-full rounded-full" /></TableCell>
-                            <TableCell className="pr-6"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
-                          </TableRow>
-                        ))
-                      : (wards ?? []).map(ward => (
-                          <TableRow key={ward.ward} className="border-slate-800 hover:bg-slate-800/30 transition-colors">
-                            <TableCell className="pl-6 font-semibold text-slate-200">{ward.ward}</TableCell>
-                            <TableCell className="text-right font-bold text-amber-400 tabular-nums">{ward.pendingReports}</TableCell>
-                            <TableCell className="w-44">
-                              <div className="flex items-center gap-2">
-                                <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                  <motion.div className="h-full bg-red-500 rounded-full"
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${(ward.criticalReports / maxWardCritical) * 100}%` }}
-                                    transition={{ duration: 0.8, ease: "easeOut", delay: 0.5 }} />
-                                </div>
-                                <span className="text-xs font-bold text-red-400 tabular-nums w-4 text-right">{ward.criticalReports}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="pr-6 text-right text-slate-400 tabular-nums">{ward.resolvedReports}</TableCell>
-                          </TableRow>
-                        ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.56 }} className="space-y-5">
-          <Card className="bg-slate-900 border-slate-800">
-            <CardHeader className="border-b border-slate-800 py-3 px-5">
-              <CardTitle className="text-sm font-semibold text-slate-300">Severity Breakdown</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-5">
-              <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={severityData} margin={{ top: 0, right: 4, left: -24, bottom: 0 }}>
-                    <XAxis dataKey="name" stroke="#475569" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#475569" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
-                    <RechartsTooltip cursor={{ fill: "rgba(255,255,255,0.04)" }} contentStyle={CHART_STYLE} />
-                    <Bar dataKey="count" radius={[5, 5, 0, 0]} maxBarSize={38}>
-                      {severityData.map((e, i) => <Cell key={i} fill={e.color} fillOpacity={0.85} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-slate-900 border-slate-800">
-            <CardHeader className="border-b border-slate-800 py-3 px-5">
-              <CardTitle className="text-sm font-semibold text-slate-300">Status Split</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 pt-5">
-              <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={statusData} cx="40%" cy="50%" innerRadius={34} outerRadius={58} paddingAngle={3} dataKey="value" stroke="none">
-                      {statusData.map((e, i) => <Cell key={i} fill={e.color} fillOpacity={0.9} />)}
-                    </Pie>
-                    <Legend layout="vertical" align="right" verticalAlign="middle" iconType="circle" iconSize={7}
-                      formatter={v => <span className="text-[10px] text-slate-400">{v}</span>} />
-                    <RechartsTooltip contentStyle={CHART_STYLE} itemStyle={{ color: "#f1f5f9" }} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-br from-blue-950/40 to-slate-900 border-blue-900/30">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-2 mb-2">
-                <Droplets className="w-4 h-4 text-blue-400" />
-                <h4 className="text-sm font-bold text-slate-300">NRW Impact</h4>
-              </div>
-              <div className="text-3xl font-black text-blue-400 tabular-nums mb-1">
-                {isSummaryLoading ? <Skeleton className="h-8 w-20" /> : `${summary?.nrwReductionEstimate ?? 0}L`}
-              </div>
-              <p className="text-[11px] text-slate-500">non-revenue water recovered</p>
-              <p className="text-[10px] text-slate-600 mt-1">@ 0.5 KL per resolved report</p>
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
     </div>
   );
 }
@@ -456,22 +591,28 @@ function ReportsTab() {
   const [severityFilter, setSeverityFilter] = useState("all");
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
-  const { data: reports, isLoading, refetch } = useListReports();
+  const { data: reports, isLoading, refetch } = useListReports(
+    undefined,
+    { query: { refetchInterval: 15_000 } }
+  );
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: getListReportsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetSeverityBreakdownQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getGetStatusBreakdownQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListWardsQueryKey() });
+  };
 
   const updateMutation = useUpdateReport({
     mutation: {
       onSuccess: (data) => {
-        queryClient.invalidateQueries({ queryKey: getListReportsQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetRecentActivityQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetSeverityBreakdownQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getGetStatusBreakdownQueryKey() });
+        invalidateAll();
         setUpdatingId(null);
         toast({
           title: data.status === "resolved" ? "✓ Report Resolved" : "Status Updated",
-          description: data.status === "resolved"
-            ? "Removed from the public map and feed instantly."
-            : `Status changed to ${fmt(data.status)}.`,
+          description: `Status changed to ${fmt(data.status)}.`,
         });
       },
       onError: () => {
@@ -493,12 +634,9 @@ function ReportsTab() {
       <div className="flex flex-col md:flex-row gap-3 p-4 bg-slate-900/80 border border-slate-800 rounded-2xl">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <Input
-            placeholder="Search by title, ward, reporter name, or ID…"
-            value={search}
+          <Input placeholder="Search by title, ward, reporter name, or ID…" value={search}
             onChange={e => setSearch(e.target.value)}
-            className="pl-10 bg-slate-950 border-slate-800 text-slate-100 focus:border-cyan-600 focus:ring-0 rounded-xl h-10"
-          />
+            className="pl-10 bg-slate-950 border-slate-800 text-slate-100 focus:border-cyan-600 focus:ring-0 rounded-xl h-10" />
         </div>
         <div className="flex gap-3">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -523,7 +661,8 @@ function ReportsTab() {
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={() => refetch()} className="h-10 px-3 border-slate-800 text-slate-400 hover:text-slate-100">
+          <Button variant="outline" size="sm" onClick={() => refetch()}
+            className="h-10 px-3 border-slate-800 text-slate-400 hover:text-slate-100">
             <RefreshCw className="w-4 h-4" />
           </Button>
         </div>
@@ -540,10 +679,8 @@ function ReportsTab() {
         {isLoading
           ? Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="p-4 rounded-2xl border border-slate-800 bg-slate-900/60 flex gap-4 items-center">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-5 w-16 rounded-full" />
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-9 w-40 ml-auto rounded-xl" />
+                <Skeleton className="h-4 w-32" /><Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-4 w-24" /><Skeleton className="h-9 w-40 ml-auto rounded-xl" />
               </div>
             ))
           : filtered.length === 0
@@ -554,8 +691,7 @@ function ReportsTab() {
               </div>
             )
           : filtered.map((report: Report, idx: number) => (
-              <motion.div
-                key={report.id}
+              <motion.div key={report.id}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.18, delay: Math.min(idx * 0.03, 0.5) }}
@@ -606,14 +742,12 @@ function ReportsTab() {
                         }}
                         disabled={updatingId !== null}
                       >
-                        <SelectTrigger
-                          className="w-[176px] rounded-xl h-9 text-xs font-bold border-2"
+                        <SelectTrigger className="w-[176px] rounded-xl h-9 text-xs font-bold border-2"
                           style={{
                             borderColor: `${STATUS_COLORS[report.status as keyof typeof STATUS_COLORS]}60`,
                             color: STATUS_COLORS[report.status as keyof typeof STATUS_COLORS],
                             backgroundColor: `${STATUS_COLORS[report.status as keyof typeof STATUS_COLORS]}12`,
-                          }}
-                        >
+                          }}>
                           <SelectValue />
                           <ChevronDown className="w-3.5 h-3.5 ml-auto opacity-60" />
                         </SelectTrigger>
@@ -639,22 +773,19 @@ function ReportsTab() {
 // ── TAB: HEATMAP ─────────────────────────────────────────────────────────────
 
 function HeatmapTab() {
-  const { data: wards, isLoading } = useListWards();
+  const { data: wards, isLoading } = useListWards(undefined, { query: { refetchInterval: 15_000 } });
 
   const heatData = useMemo(() => {
     if (!wards) return [];
     const maxTotal = Math.max(1, ...wards.map(w => w.pendingReports + w.resolvedReports));
-    return wards
-      .map(w => {
-        const total     = w.pendingReports + w.resolvedReports;
-        const critRatio = w.criticalReports / Math.max(1, total);
-        const intensity = total / maxTotal;
-        const heatScore = Math.round((critRatio * 0.6 + intensity * 0.4) * 100);
-        const hue       = Math.round(120 - heatScore * 1.2);
-        const color     = `hsl(${hue}, 70%, 50%)`;
-        return { ...w, total, critRatio, intensity, heatScore, color };
-      })
-      .sort((a, b) => b.heatScore - a.heatScore);
+    return wards.map(w => {
+      const total     = w.pendingReports + w.resolvedReports;
+      const critRatio = w.criticalReports / Math.max(1, total);
+      const intensity = total / maxTotal;
+      const heatScore = Math.round((critRatio * 0.6 + intensity * 0.4) * 100);
+      const hue       = Math.round(120 - heatScore * 1.2);
+      return { ...w, total, heatScore, color: `hsl(${hue}, 70%, 50%)` };
+    }).sort((a, b) => b.heatScore - a.heatScore);
   }, [wards]);
 
   const maxScore = heatData[0]?.heatScore ?? 1;
@@ -670,9 +801,7 @@ function HeatmapTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-slate-200">Leak Density Heatmap</h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Wards ranked by intensity score — combines report volume and critical severity ratio. Use this to prioritise field dispatch.
-          </p>
+          <p className="text-xs text-slate-500 mt-0.5">Wards ranked by intensity score — combines report volume and critical severity ratio.</p>
         </div>
         <div className="hidden md:flex items-center gap-3 text-xs text-slate-500">
           {[["#22c55e", "Low"], ["#eab308", "Medium"], ["#ef4444", "High"]].map(([c, l]) => (
@@ -682,23 +811,18 @@ function HeatmapTab() {
           ))}
         </div>
       </div>
-
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {heatData.map((ward, i) => (
           <motion.div key={ward.ward}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
+            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: i * 0.04, duration: 0.25 }}
-            className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors relative overflow-hidden"
-          >
+            className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors relative overflow-hidden">
             <div className="absolute inset-0 opacity-[0.06] rounded-2xl" style={{ backgroundColor: ward.color }} />
             <div className="relative z-10">
               <div className="flex items-start justify-between mb-2">
                 <span className="text-[10px] font-black text-slate-600">#{i + 1}</span>
                 <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md"
-                  style={{ backgroundColor: `${ward.color}25`, color: ward.color }}>
-                  {ward.heatScore}
-                </span>
+                  style={{ backgroundColor: `${ward.color}25`, color: ward.color }}>{ward.heatScore}</span>
               </div>
               <h4 className="text-xs font-bold text-slate-200 leading-tight mb-2">{ward.ward}</h4>
               <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden mb-2">
@@ -721,11 +845,10 @@ function HeatmapTab() {
           </motion.div>
         ))}
       </div>
-
       {heatData.length === 0 && (
         <div className="text-center py-20 text-slate-600">
           <Thermometer className="w-12 h-12 mx-auto mb-3 opacity-20" />
-          <p className="font-semibold text-slate-400">No ward data available</p>
+          <p className="font-semibold text-slate-400">No ward data available yet</p>
         </div>
       )}
     </div>
@@ -741,9 +864,7 @@ function LeaderboardTab() {
     <div className="space-y-3">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-800 bg-slate-900/60">
-          <Skeleton className="w-9 h-9 rounded-full" />
-          <Skeleton className="h-4 w-40 flex-1" />
-          <Skeleton className="h-4 w-16" />
+          <Skeleton className="w-9 h-9 rounded-full" /><Skeleton className="h-4 w-40 flex-1" /><Skeleton className="h-4 w-16" />
         </div>
       ))}
     </div>
@@ -753,7 +874,7 @@ function LeaderboardTab() {
     <div className="space-y-5">
       <div>
         <h2 className="text-base font-bold text-slate-200 mb-1">Top Citizen Reporters</h2>
-        <p className="text-xs text-slate-500">Ranked by Eco Points. Consider acknowledging top contributors for civic engagement.</p>
+        <p className="text-xs text-slate-500">Ranked by Eco Points — computed from all verified submissions.</p>
       </div>
       <Card className="bg-slate-900 border-slate-800 overflow-hidden">
         <CardContent className="p-0">
@@ -768,11 +889,9 @@ function LeaderboardTab() {
                           : null;
               return (
                 <motion.div key={user.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
+                  initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.06, duration: 0.2 }}
-                  className="flex items-center gap-4 px-6 py-4 hover:bg-slate-800/30 transition-colors"
-                >
+                  className="flex items-center gap-4 px-6 py-4 hover:bg-slate-800/30 transition-colors">
                   <div className="w-6 text-center">
                     {icon ?? <span className="text-sm font-black text-slate-600">{i + 1}</span>}
                   </div>
@@ -787,7 +906,7 @@ function LeaderboardTab() {
                       <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${color}`}>{tier}</span>
                     </div>
                     <div className="text-xs text-slate-500 flex items-center gap-3">
-                      <span>{user.reportsSubmitted} reports submitted</span>
+                      <span>{user.reportsSubmitted} submitted</span>
                       <span className="text-green-400">{user.reportsVerified} verified</span>
                     </div>
                     {next.tier !== "Max" && (
@@ -818,88 +937,33 @@ function LeaderboardTab() {
 // ── TAB: DIRECTORY ────────────────────────────────────────────────────────────
 
 const ZONES = [
-  {
-    zone: "City Zone (Island City)",
-    wards: ["A Ward", "B Ward", "C Ward", "D Ward"],
-    engineer: "Ramesh Patil",
-    phone: "+91 22 2369 7000",
-    email: "city.hydraulic@mcgm.gov.in",
-    teams: 3,
-  },
-  {
-    zone: "Western Suburbs — North",
-    wards: ["Andheri West", "Andheri East", "Jogeshwari"],
-    engineer: "Suresh Nair",
-    phone: "+91 22 2631 4400",
-    email: "ws.north.hydraulic@mcgm.gov.in",
-    teams: 4,
-  },
-  {
-    zone: "Western Suburbs — South",
-    wards: ["Bandra West", "Bandra East", "Santacruz East", "Santacruz West", "Khar"],
-    engineer: "Meena Kulkarni",
-    phone: "+91 22 2642 9100",
-    email: "ws.south.hydraulic@mcgm.gov.in",
-    teams: 4,
-  },
-  {
-    zone: "Western Suburbs — Far North",
-    wards: ["Borivali", "Kandivali East", "Kandivali West", "Malad East", "Malad West", "Goregaon East", "Goregaon West"],
-    engineer: "Dinesh Shetty",
-    phone: "+91 22 2897 2200",
-    email: "ws.farnorth.hydraulic@mcgm.gov.in",
-    teams: 5,
-  },
-  {
-    zone: "Eastern Suburbs — North",
-    wards: ["Powai", "Vikhroli", "Bhandup", "Mulund"],
-    engineer: "Anjali Sharma",
-    phone: "+91 22 2578 3300",
-    email: "es.north.hydraulic@mcgm.gov.in",
-    teams: 3,
-  },
-  {
-    zone: "Eastern Suburbs — South",
-    wards: ["Ghatkopar", "Chembur", "Kurla", "Dadar"],
-    engineer: "Prakash Desai",
-    phone: "+91 22 2512 8800",
-    email: "es.south.hydraulic@mcgm.gov.in",
-    teams: 4,
-  },
-  {
-    zone: "Southern Mumbai",
-    wards: ["Worli", "Juhu", "Mahim"],
-    engineer: "Kavita Joshi",
-    phone: "+91 22 2437 6600",
-    email: "south.hydraulic@mcgm.gov.in",
-    teams: 3,
-  },
+  { zone: "City Zone (Island City)",        wards: ["A Ward","B Ward","C Ward","D Ward"],                                              engineer: "Ramesh Patil",    phone: "+91 22 2369 7000", email: "city.hydraulic@mcgm.gov.in",       teams: 3 },
+  { zone: "Western Suburbs — North",        wards: ["Andheri West","Andheri East","Jogeshwari"],                                       engineer: "Suresh Nair",     phone: "+91 22 2631 4400", email: "ws.north.hydraulic@mcgm.gov.in",    teams: 4 },
+  { zone: "Western Suburbs — South",        wards: ["Bandra West","Bandra East","Santacruz East","Santacruz West","Khar"],             engineer: "Meena Kulkarni",  phone: "+91 22 2642 9100", email: "ws.south.hydraulic@mcgm.gov.in",    teams: 4 },
+  { zone: "Western Suburbs — Far North",    wards: ["Borivali","Kandivali East","Kandivali West","Malad East","Malad West","Goregaon East","Goregaon West"], engineer: "Dinesh Shetty", phone: "+91 22 2897 2200", email: "ws.farnorth.hydraulic@mcgm.gov.in", teams: 5 },
+  { zone: "Eastern Suburbs — North",        wards: ["Powai","Vikhroli","Bhandup","Mulund"],                                            engineer: "Anjali Sharma",   phone: "+91 22 2578 3300", email: "es.north.hydraulic@mcgm.gov.in",    teams: 3 },
+  { zone: "Eastern Suburbs — South",        wards: ["Ghatkopar","Chembur","Kurla","Dadar"],                                            engineer: "Prakash Desai",   phone: "+91 22 2512 8800", email: "es.south.hydraulic@mcgm.gov.in",    teams: 4 },
+  { zone: "Southern Mumbai",                wards: ["Worli","Juhu","Mahim"],                                                            engineer: "Kavita Joshi",    phone: "+91 22 2437 6600", email: "south.hydraulic@mcgm.gov.in",       teams: 3 },
 ];
-
 const EMERGENCY = [
-  { label: "BMC Water Helpline",         number: "1916",           desc: "24 × 7 water complaints" },
-  { label: "MCGM Disaster Management",   number: "1800 222 1234",  desc: "Emergency response" },
-  { label: "Hydraulic Engineer HQ",      number: "+91 22 2369 7000", desc: "Main office, Mumbai" },
-  { label: "Sewerage Operations Centre", number: "+91 22 2369 6800", desc: "Mon–Sat 8 am – 8 pm" },
+  { label: "BMC Water Helpline",          number: "1916",               desc: "24 × 7 water complaints" },
+  { label: "MCGM Disaster Management",    number: "1800 222 1234",      desc: "Emergency response" },
+  { label: "Hydraulic Engineer HQ",       number: "+91 22 2369 7000",   desc: "Main office, Mumbai" },
+  { label: "Sewerage Operations Centre",  number: "+91 22 2369 6800",   desc: "Mon–Sat 8 am – 8 pm" },
 ];
-
 const DEPT = [
-  { dept: "Hydraulic Engineering Dept.",  head: "Chief Engineer (HE)", contact: "he@mcgm.gov.in",         phone: "+91 22 2369 7001" },
-  { dept: "Water Supply Division",        head: "Dy. Commissioner (E&P)", contact: "ws@mcgm.gov.in",      phone: "+91 22 2369 7002" },
-  { dept: "Maintenance & Repairs",        head: "Supt. Engineer (M&R)", contact: "mr@mcgm.gov.in",        phone: "+91 22 2369 7003" },
-  { dept: "Quality Control Lab",          head: "Chemical Analyser",    contact: "qc.lab@mcgm.gov.in",    phone: "+91 22 2369 7004" },
-  { dept: "Complaints & Grievances",      head: "PRO",                  contact: "complaints@mcgm.gov.in", phone: "1916" },
+  { dept: "Hydraulic Engineering Dept.",   head: "Chief Engineer (HE)",        contact: "he@mcgm.gov.in",          phone: "+91 22 2369 7001" },
+  { dept: "Water Supply Division",         head: "Dy. Commissioner (E&P)",     contact: "ws@mcgm.gov.in",           phone: "+91 22 2369 7002" },
+  { dept: "Maintenance & Repairs",         head: "Supt. Engineer (M&R)",       contact: "mr@mcgm.gov.in",           phone: "+91 22 2369 7003" },
+  { dept: "Quality Control Lab",           head: "Chemical Analyser",          contact: "qc.lab@mcgm.gov.in",       phone: "+91 22 2369 7004" },
+  { dept: "Complaints & Grievances",       head: "PRO",                        contact: "complaints@mcgm.gov.in",   phone: "1916" },
 ];
 
-export function DirectoryTab() {
+function DirectoryTab() {
   const [search, setSearch] = useState("");
   const lc = search.toLowerCase();
-
   const filteredZones = ZONES.filter(z =>
-    lc === "" ||
-    z.zone.toLowerCase().includes(lc) ||
-    z.engineer.toLowerCase().includes(lc) ||
-    z.wards.some(w => w.toLowerCase().includes(lc))
+    lc === "" || z.zone.toLowerCase().includes(lc) || z.engineer.toLowerCase().includes(lc) || z.wards.some(w => w.toLowerCase().includes(lc))
   );
 
   return (
@@ -907,20 +971,16 @@ export function DirectoryTab() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h2 className="text-base font-bold text-slate-200 mb-1">Field Directory</h2>
-          <p className="text-xs text-slate-500">Zone-wise hydraulic engineers, field teams, and department contacts. For internal use only.</p>
+          <p className="text-xs text-slate-500">Zone-wise hydraulic engineers, field teams, and department contacts.</p>
         </div>
         <div className="relative w-full md:w-72">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
+          <Input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search zone, ward, or engineer…"
-            className="pl-10 bg-slate-950 border-slate-800 text-slate-100 focus:border-cyan-600 rounded-xl h-9 text-sm"
-          />
+            className="pl-10 bg-slate-950 border-slate-800 text-slate-100 focus:border-cyan-600 rounded-xl h-9 text-sm" />
         </div>
       </div>
 
-      {/* Emergency contacts */}
       <div className="space-y-3">
         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
           <span className="w-1 h-4 bg-red-500 rounded-full" />Emergency Contacts
@@ -943,14 +1003,11 @@ export function DirectoryTab() {
         </div>
       </div>
 
-      {/* Zone engineers */}
       <div className="space-y-3">
         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
           <span className="w-1 h-4 bg-cyan-500 rounded-full" />
           Hydraulic Engineers by Zone
-          {filteredZones.length !== ZONES.length && (
-            <span className="ml-2 text-cyan-500 font-normal normal-case">— {filteredZones.length} of {ZONES.length}</span>
-          )}
+          {filteredZones.length !== ZONES.length && <span className="ml-2 text-cyan-500 font-normal normal-case">— {filteredZones.length} of {ZONES.length}</span>}
         </h3>
         <div className="space-y-3">
           {filteredZones.length === 0 ? (
@@ -958,55 +1015,46 @@ export function DirectoryTab() {
               <Building2 className="w-10 h-10 mx-auto mb-3 opacity-20" />
               <p className="text-slate-400 font-semibold">No zones match your search</p>
             </div>
-          ) : (
-            filteredZones.map((z, i) => (
-              <motion.div
-                key={z.zone}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.06, duration: 0.2 }}
-              >
-                <Card className="bg-slate-900 border-slate-800">
-                  <CardContent className="p-5">
-                    <div className="flex flex-col md:flex-row md:items-start gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start gap-3 mb-3">
-                          <div className="w-10 h-10 rounded-xl bg-cyan-950/50 border border-cyan-900/40 flex items-center justify-center flex-shrink-0">
-                            <Building2 className="w-4 h-4 text-cyan-400" />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-bold text-slate-100 leading-tight">{z.zone}</h4>
-                            <p className="text-xs text-slate-500 mt-0.5">Hydraulic Engineer: <span className="text-slate-300 font-semibold">{z.engineer}</span></p>
-                          </div>
+          ) : filteredZones.map((z, i) => (
+            <motion.div key={z.zone} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06, duration: 0.2 }}>
+              <Card className="bg-slate-900 border-slate-800">
+                <CardContent className="p-5">
+                  <div className="flex flex-col md:flex-row md:items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-xl bg-cyan-950/50 border border-cyan-900/40 flex items-center justify-center flex-shrink-0">
+                          <Building2 className="w-4 h-4 text-cyan-400" />
                         </div>
-                        <div className="flex flex-wrap gap-1.5 mb-3">
-                          {z.wards.map(w => (
-                            <span key={w} className="text-[10px] font-semibold bg-slate-800 text-slate-300 px-2 py-0.5 rounded-lg border border-slate-700/60">{w}</span>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-600">
-                          <Users className="w-3.5 h-3.5" />
-                          <span>{z.teams} field teams assigned</span>
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-100 leading-tight">{z.zone}</h4>
+                          <p className="text-xs text-slate-500 mt-0.5">Engineer: <span className="text-slate-300 font-semibold">{z.engineer}</span></p>
                         </div>
                       </div>
-                      <div className="flex flex-col gap-2 md:items-end shrink-0">
-                        <a href={`tel:${z.phone}`} className="flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-cyan-300 transition-colors">
-                          <Phone className="w-3.5 h-3.5 text-slate-500" />{z.phone}
-                        </a>
-                        <a href={`mailto:${z.email}`} className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-cyan-400 transition-colors">
-                          <Mail className="w-3.5 h-3.5 text-slate-600" />{z.email}
-                        </a>
+                      <div className="flex flex-wrap gap-1.5 mb-3">
+                        {z.wards.map(w => (
+                          <span key={w} className="text-[10px] font-semibold bg-slate-800 text-slate-300 px-2 py-0.5 rounded-lg border border-slate-700/60">{w}</span>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                        <Users className="w-3.5 h-3.5" />{z.teams} field teams assigned
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))
-          )}
+                    <div className="flex flex-col gap-2 md:items-end shrink-0">
+                      <a href={`tel:${z.phone}`} className="flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-cyan-300 transition-colors">
+                        <Phone className="w-3.5 h-3.5 text-slate-500" />{z.phone}
+                      </a>
+                      <a href={`mailto:${z.email}`} className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-cyan-400 transition-colors">
+                        <Mail className="w-3.5 h-3.5 text-slate-600" />{z.email}
+                      </a>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
         </div>
       </div>
 
-      {/* Department contacts */}
       <div className="space-y-3">
         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
           <span className="w-1 h-4 bg-indigo-500 rounded-full" />Department Contacts
@@ -1015,13 +1063,10 @@ export function DirectoryTab() {
           <CardContent className="p-0">
             <div className="divide-y divide-slate-800/60">
               {DEPT.map((d, i) => (
-                <motion.div
-                  key={d.dept}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
+                <motion.div key={d.dept}
+                  initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.06, duration: 0.2 }}
-                  className="flex flex-col md:flex-row md:items-center justify-between gap-2 px-5 py-4 hover:bg-slate-800/30 transition-colors"
-                >
+                  className="flex flex-col md:flex-row md:items-center justify-between gap-2 px-5 py-4 hover:bg-slate-800/30 transition-colors">
                   <div>
                     <p className="text-sm font-bold text-slate-200">{d.dept}</p>
                     <p className="text-xs text-slate-500 mt-0.5">Head: {d.head}</p>
@@ -1053,15 +1098,11 @@ function ExportTab() {
 
   const downloadCSV = () => {
     if (!reports) return;
-    const headers = ["ID", "Title", "Ward", "Severity", "Status", "Reporter", "Description", "Upvotes", "Created", "Resolved"];
+    const headers = ["ID","Title","Ward","Severity","Status","Reporter","Description","Upvotes","Created","Resolved"];
     const rows = reports.map(r => [
-      r.id,
-      `"${r.title.replace(/"/g, '""')}"`,
-      `"${r.ward}"`,
-      r.severity,
-      r.status,
-      `"${(r.reporterName ?? "").replace(/"/g, '""')}"`,
-      `"${(r.description ?? "").replace(/"/g, '""')}"`,
+      r.id, `"${r.title.replace(/"/g,'""')}"`, `"${r.ward}"`, r.severity, r.status,
+      `"${(r.reporterName ?? "").replace(/"/g,'""')}"`,
+      `"${(r.description ?? "").replace(/"/g,'""')}"`,
       r.upvotes,
       format(new Date(r.createdAt), "yyyy-MM-dd HH:mm"),
       r.resolvedAt ? format(new Date(r.resolvedAt), "yyyy-MM-dd HH:mm") : "",
@@ -1078,7 +1119,8 @@ function ExportTab() {
     setTimeout(() => setDownloaded(false), 3000);
   };
 
-  const count = reports?.length ?? 0;
+  const count  = reports?.length ?? 0;
+  const active = (summary?.pendingReports ?? 0) + (summary?.inProgressReports ?? 0);
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -1090,9 +1132,9 @@ function ExportTab() {
         <CardContent className="p-6 space-y-5">
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: "Total records",   value: count,                          color: "text-slate-200" },
-              { label: "Active reports",  value: (summary?.pendingReports ?? 0) + (summary?.inProgressReports ?? 0), color: "text-amber-400" },
-              { label: "Resolved",        value: summary?.resolvedReports ?? 0,  color: "text-emerald-400" },
+              { label: "Total records", value: count,                          color: "text-slate-200" },
+              { label: "Active reports", value: active,                        color: "text-amber-400" },
+              { label: "Resolved",       value: summary?.resolvedReports ?? 0, color: "text-emerald-400" },
             ].map(({ label, value, color }) => (
               <div key={label} className="text-center p-3 bg-slate-950/60 rounded-xl border border-slate-800/40">
                 <div className={`text-2xl font-black tabular-nums ${color}`}>{value}</div>
@@ -1100,22 +1142,17 @@ function ExportTab() {
               </div>
             ))}
           </div>
-
           <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800/40 text-xs text-slate-400 space-y-1">
-            <p className="font-semibold text-slate-300 mb-2">Columns included in export:</p>
-            {["Report ID", "Title", "Ward / Area", "Severity", "Status", "Reporter Name", "Description", "Upvote Count", "Date Submitted (IST)", "Date Resolved (IST)"].map(col => (
+            <p className="font-semibold text-slate-300 mb-2">Columns included:</p>
+            {["Report ID","Title","Ward / Area","Severity","Status","Reporter Name","Description","Upvote Count","Date Submitted (IST)","Date Resolved (IST)"].map(col => (
               <div key={col} className="flex items-center gap-2">
                 <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" />{col}
               </div>
             ))}
           </div>
-
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            <Button
-              onClick={downloadCSV}
-              disabled={!reports || count === 0}
-              className="w-full h-11 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.25)] gap-2"
-            >
+            <Button onClick={downloadCSV} disabled={!reports || count === 0}
+              className="w-full h-11 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.25)] gap-2">
               {downloaded
                 ? <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Downloaded!</span>
                 : <span className="flex items-center gap-2"><Download className="w-4 h-4" />Download CSV ({count} records)</span>}
@@ -1123,7 +1160,6 @@ function ExportTab() {
           </motion.div>
         </CardContent>
       </Card>
-
       <Card className="bg-slate-900 border-slate-800">
         <CardContent className="p-5">
           <h4 className="text-sm font-bold text-slate-300 mb-3">Data notes</h4>
@@ -1176,15 +1212,12 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Tab nav */}
       <div className="flex gap-1 px-6 lg:px-8 py-3 border-b border-slate-800 bg-slate-900/40 flex-shrink-0 overflow-x-auto">
         {TABS.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
               activeTab === tab.key
                 ? "bg-cyan-950/60 text-cyan-300 border border-cyan-900/60 shadow-[0_0_12px_rgba(6,182,212,0.1)]"
                 : "text-slate-500 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent"
-            }`}
-          >
+            }`}>
             <tab.icon className="w-3.5 h-3.5" />
             {tab.label}
           </button>
@@ -1193,15 +1226,11 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-7xl mx-auto p-6 lg:p-8">
+        <div className="max-w-[1600px] mx-auto p-6 lg:p-8">
           <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2 }}
-            >
+            <motion.div key={activeTab}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2 }}>
               {activeTab === "overview"    && <OverviewTab />}
               {activeTab === "reports"     && <ReportsTab />}
               {activeTab === "heatmap"     && <HeatmapTab />}
@@ -1222,7 +1251,6 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() =>
     sessionStorage.getItem(SESSION_KEY) === "true"
   );
-
   return (
     <AnimatePresence mode="wait">
       {isAuthenticated ? (

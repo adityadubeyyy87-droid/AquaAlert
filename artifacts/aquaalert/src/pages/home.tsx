@@ -1,173 +1,30 @@
-import { Link } from "wouter";
-import { useListReports, useGetDashboardSummary, useGetRecentActivity } from "@workspace/api-client-react";
+import { useListReports } from "@workspace/api-client-react";
 import LiveMap from "@/components/map/LiveMap";
-import { AlertCircle, CheckCircle2, Droplets, Activity, MapPin, ArrowUpRight, Zap, Droplet } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { SEVERITY_COLORS } from "@/lib/constants";
-import { formatDistanceToNow } from "date-fns";
+import { Droplet } from "lucide-react";
 import { motion } from "framer-motion";
 
-function StatPill({ icon: Icon, label, value, colorClass, pulse }: {
-  icon: React.ElementType; label: string; value: React.ReactNode; colorClass: string; pulse?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-3 px-5 py-0.5">
-      <div className={`relative w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${colorClass}`}>
-        {pulse && <span className="absolute inset-0 rounded-lg animate-ping opacity-25 bg-current" />}
-        <Icon className="w-4 h-4 relative z-10" />
-      </div>
-      <div>
-        <p className="text-[10px] font-semibold text-slate-500 leading-none mb-1 uppercase tracking-wider">{label}</p>
-        <div className="text-[22px] font-black text-slate-100 leading-none tabular-nums">{value}</div>
-      </div>
-    </div>
-  );
-}
-
-const feedVariants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.06, delayChildren: 0.1 } },
-};
-const feedItem = {
-  hidden: { opacity: 0, x: 12 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.22 } },
-};
-
 export default function Home() {
-  const { data: reports, isLoading: isReportsLoading } = useListReports();
-  const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary();
-  const { data: recentActivity, isLoading: isActivityLoading } = useGetRecentActivity({ limit: 20 });
+  const { data: reports, isLoading } = useListReports();
 
-  const skeleton = <Skeleton className="h-5 w-10 inline-block align-middle" />;
+  if (isLoading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-slate-900">
+        <div className="flex flex-col items-center gap-3">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+          >
+            <Droplet className="w-10 h-10 text-cyan-500" />
+          </motion.div>
+          <p className="text-sm text-slate-500">Loading Mumbai water grid…</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-full w-full">
-      {/* Map */}
-      <div className="flex-1 relative">
-        {/* Stats bar */}
-        <div className="absolute top-5 left-1/2 -translate-x-1/2 z-[400] w-auto">
-          <motion.div
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.1 }}
-            className="flex items-center bg-slate-900/94 backdrop-blur-lg border border-slate-800/80 rounded-2xl shadow-2xl divide-x divide-slate-800 overflow-hidden"
-          >
-            <StatPill icon={Droplets} label="Active Leaks" value={isSummaryLoading ? skeleton : summary?.pendingReports ?? 0} colorClass="bg-cyan-500/15 text-cyan-400" />
-            <StatPill icon={AlertCircle} label="Critical" value={isSummaryLoading ? skeleton : summary?.criticalReports ?? 0} colorClass="bg-red-500/15 text-red-400" pulse={(summary?.criticalReports ?? 0) > 0} />
-            <StatPill icon={CheckCircle2} label="Resolved" value={isSummaryLoading ? skeleton : summary?.resolvedReports ?? 0} colorClass="bg-green-500/15 text-green-400" />
-            <div className="px-5 py-0.5">
-              <p className="text-[10px] font-semibold text-slate-500 leading-none mb-1 uppercase tracking-wider">NRW Saved</p>
-              <div className="text-[22px] font-black text-blue-400 leading-none tabular-nums">
-                {isSummaryLoading ? skeleton : `${summary?.nrwReductionEstimate ?? 0}L`}
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {isReportsLoading ? (
-          <div className="w-full h-full flex items-center justify-center bg-slate-900">
-            <div className="flex flex-col items-center gap-3">
-              <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}>
-                <Droplet className="w-10 h-10 text-cyan-500" />
-              </motion.div>
-              <p className="text-sm text-slate-500">Loading Mumbai water grid…</p>
-            </div>
-          </div>
-        ) : (
-          <LiveMap reports={reports || []} />
-        )}
-      </div>
-
-      {/* Live Feed */}
-      <div className="w-[340px] shrink-0 border-l border-slate-800 bg-slate-900/80 flex flex-col z-10 shadow-[-12px_0_40px_rgba(0,0,0,0.4)] backdrop-blur-sm">
-        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-              <Zap className="w-3.5 h-3.5 text-cyan-400" />
-              Live Feed
-            </h3>
-            <p className="text-[11px] text-slate-500 mt-0.5">Latest citizen reports</p>
-          </div>
-          {recentActivity && (
-            <motion.span
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              className="text-[10px] font-bold bg-cyan-950/60 text-cyan-400 border border-cyan-900/50 px-2 py-0.5 rounded-full"
-            >
-              {recentActivity.length} recent
-            </motion.span>
-          )}
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-3">
-          {isActivityLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="p-3 rounded-xl border border-slate-800 flex gap-3">
-                  <Skeleton className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" />
-                  <div className="space-y-2 flex-1"><Skeleton className="h-3.5 w-3/4" /><Skeleton className="h-3 w-1/2" /></div>
-                </div>
-              ))}
-            </div>
-          ) : recentActivity && recentActivity.filter(r => r.status !== "resolved" && r.status !== "rejected").length > 0 ? (
-            <motion.div variants={feedVariants} initial="hidden" animate="visible" className="space-y-2">
-              {recentActivity.filter(r => r.status !== "resolved" && r.status !== "rejected").map((report) => {
-                const color = SEVERITY_COLORS[report.severity as keyof typeof SEVERITY_COLORS];
-                return (
-                  <motion.div key={report.id} variants={feedItem}>
-                    <Link href={`/reports/${report.id}`}>
-                      <div className="group p-3 rounded-xl border border-slate-800/60 bg-slate-950/40 hover:bg-slate-800/60 hover:border-slate-700 transition-all cursor-pointer">
-                        <div className="flex items-start justify-between gap-2 mb-1.5">
-                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                            <span
-                              className="w-2 h-2 rounded-full flex-shrink-0 mt-0.5"
-                              style={{ backgroundColor: color, boxShadow: report.severity === "critical" ? `0 0 6px ${color}` : undefined }}
-                            />
-                            <h4 className="text-[13px] font-semibold text-slate-200 group-hover:text-cyan-300 transition-colors truncate leading-snug">
-                              {report.title}
-                            </h4>
-                          </div>
-                          <ArrowUpRight className="w-3.5 h-3.5 text-slate-600 group-hover:text-cyan-400 transition-colors flex-shrink-0 mt-0.5" />
-                        </div>
-                        <div className="flex items-center justify-between pl-3.5">
-                          <div className="flex items-center text-[11px] text-slate-500 gap-1">
-                            <MapPin className="w-3 h-3" /><span>{report.ward}</span>
-                          </div>
-                          <span className="text-[10px] text-slate-600">
-                            {formatDistanceToNow(new Date(report.createdAt), { addSuffix: true })}
-                          </span>
-                        </div>
-                        <div className="mt-1.5 pl-3.5 flex items-center gap-2">
-                          <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4 font-bold" style={{ color, borderColor: `${color}40` }}>
-                            {report.severity.toUpperCase()}
-                          </Badge>
-                          <span className="text-[10px] text-slate-600">▲ {report.upvotes}</span>
-                        </div>
-                      </div>
-                    </Link>
-                  </motion.div>
-                );
-              })}
-            </motion.div>
-          ) : (
-            <div className="text-center py-16 text-slate-600">
-              <MapPin className="w-10 h-10 mx-auto mb-3 opacity-20" />
-              <p className="text-sm">No reports yet</p>
-            </div>
-          )}
-        </div>
-
-        {/* Quick stats footer */}
-        <div className="border-t border-slate-800 px-5 py-3 flex items-center justify-between">
-          <Link href="/reports">
-            <span className="text-xs text-cyan-400 hover:text-cyan-300 cursor-pointer transition-colors font-medium">View all reports →</span>
-          </Link>
-          <span className="text-[10px] text-slate-600 flex items-center gap-1">
-            <Activity className="w-3 h-3" /> Live data
-          </span>
-        </div>
-      </div>
+    <div className="w-full h-full">
+      <LiveMap reports={reports || []} />
     </div>
   );
 }
