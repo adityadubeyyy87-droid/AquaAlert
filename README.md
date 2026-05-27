@@ -72,7 +72,7 @@ A **contract-first, full-stack civic platform** that transforms passive bystande
 ### 🏆 Civic Champions Leaderboard
 
 
-![Leaderboard](attached_assets/screenshot_leaderboard.png)
+![Leaderboard](https://github.com/adityadubeyyy87-droid/AquaAlert/blob/cc59e5e5dbf7930d0450d04b984f7be567e529ee/Leaderboard.png)
 ## 🏗️ Architecture
 
 ```
