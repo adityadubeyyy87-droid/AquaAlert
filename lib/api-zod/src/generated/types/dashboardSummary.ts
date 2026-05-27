@@ -12,6 +12,7 @@ export interface DashboardSummary {
   inProgressReports: number;
   resolvedReports: number;
   resolvedToday: number;
+  resolvedThisWeek: number;
   criticalReports: number;
   totalEcoPoints: number;
   activeWards: number;

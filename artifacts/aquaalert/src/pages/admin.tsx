@@ -61,6 +61,15 @@ function AnimatedStat({ value, suffix = "" }: { value: number; suffix?: string }
   return <span>{animated}{suffix}</span>;
 }
 
+function formatResolutionTime(hours: number): string {
+  if (!hours || hours === 0) return "—";
+  const h = Math.floor(hours);
+  const m = Math.round((hours - h) * 60);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
 function SeverityBadge({ severity }: { severity: string }) {
   const color = SEVERITY_COLORS[severity as keyof typeof SEVERITY_COLORS] ?? "#94a3b8";
   return (
@@ -394,7 +403,7 @@ function OverviewTab() {
     { title: "Pending",         value: summary?.pendingReports,      icon: Clock,         color: "text-amber-400",  bg: "bg-amber-950/60",    tag: "Awaiting action" },
     { title: "In Progress",     value: summary?.inProgressReports,   icon: Droplets,      color: "text-blue-400",   bg: "bg-blue-950/60",     tag: "Teams dispatched" },
     { title: "Resolved Today",  value: summary?.resolvedToday,       icon: CheckCircle,   color: "text-green-400",  bg: "bg-green-950/60",    tag: format(new Date(), "d MMM") },
-    { title: "Avg Resolution",  value: summary?.avgResolutionHours,  icon: TrendingUp,    color: "text-purple-400", bg: "bg-purple-950/60",   tag: "hours per report", suffix: "h" },
+    { title: "Avg Resolution",  value: summary?.avgResolutionHours ?? 0, icon: TrendingUp, color: "text-purple-400", bg: "bg-purple-950/60", tag: "avg time per report", displayFn: formatResolutionTime },
     { title: "Critical Active", value: summary?.criticalReports,     icon: AlertTriangle, color: "text-red-400",    bg: "bg-red-950/60",      tag: "Immediate dispatch", urgent: true },
   ];
 
@@ -426,7 +435,11 @@ function OverviewTab() {
                     </div>
                   </div>
                   <div className={`text-3xl font-black tabular-nums mb-1 ${s.color}`}>
-                    {isSummaryLoading || s.value === undefined ? sk : <AnimatedStat value={s.value} suffix={(s as any).suffix} />}
+                    {isSummaryLoading || s.value === undefined
+                      ? sk
+                      : (s as any).displayFn
+                      ? <span>{(s as any).displayFn(s.value)}</span>
+                      : <AnimatedStat value={s.value} suffix={(s as any).suffix} />}
                   </div>
                   <p className="text-[10px] text-slate-600 mt-2 pt-2 border-t border-slate-800">{s.tag}</p>
                 </CardContent>
@@ -583,6 +596,42 @@ function OverviewTab() {
 
 // ── TAB: REPORTS ──────────────────────────────────────────────────────────────
 
+function InternalNotes({ reportId }: { reportId: number }) {
+  const key = `aquaalert_notes_${reportId}`;
+  const [note, setNote] = useState(() => localStorage.getItem(key) ?? "");
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    localStorage.setItem(key, note);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 1500);
+  };
+
+  return (
+    <div className="mt-3 pt-3 border-t border-slate-800/60 space-y-2">
+      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
+        <BookOpen className="w-3 h-3" /> Internal Notes
+        <span className="text-slate-700 font-normal">(stored locally)</span>
+      </label>
+      <textarea
+        value={note}
+        onChange={e => setNote(e.target.value)}
+        onBlur={handleSave}
+        placeholder="Add dispatch notes, follow-up instructions, or internal comments…"
+        rows={2}
+        className="w-full bg-slate-950/70 border border-slate-800 text-slate-300 text-xs rounded-xl p-2.5 resize-none focus:outline-none focus:border-cyan-800 placeholder:text-slate-700 transition-colors"
+      />
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-slate-700">{note.length}/500 chars</span>
+        <button onClick={handleSave}
+          className={`text-[11px] font-semibold px-3 py-1 rounded-lg transition-all ${saved ? "bg-green-950/60 text-green-400 border border-green-900/50" : "bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700"}`}>
+          {saved ? "✓ Saved" : "Save Note"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ReportsTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -590,6 +639,15 @@ function ReportsTab() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [expandedNotes, setExpandedNotes] = useState<Set<number>>(new Set());
+
+  const toggleNotes = (id: number) => {
+    setExpandedNotes(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   const { data: reports, isLoading, refetch } = useListReports(
     undefined,
@@ -727,8 +785,27 @@ function ReportsTab() {
                         Resolved {formatDistanceToNow(new Date(report.resolvedAt), { addSuffix: true })}
                       </div>
                     )}
+                    {report.imageUrl && (
+                      <div className="mt-2 rounded-lg overflow-hidden border border-slate-800 w-32 h-20">
+                        <img src={report.imageUrl} alt="Evidence" className="w-full h-full object-cover" />
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => toggleNotes(report.id)}
+                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-semibold border transition-all ${
+                        expandedNotes.has(report.id)
+                          ? "bg-indigo-950/50 border-indigo-900/60 text-indigo-400"
+                          : localStorage.getItem(`aquaalert_notes_${report.id}`)
+                          ? "bg-yellow-950/40 border-yellow-900/40 text-yellow-500"
+                          : "bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300"
+                      }`}
+                      title="Internal notes"
+                    >
+                      <BookOpen className="w-3 h-3" />
+                      {localStorage.getItem(`aquaalert_notes_${report.id}`) ? "Note ✓" : "Notes"}
+                    </button>
                     {updatingId === report.id ? (
                       <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 text-slate-400 text-xs">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Updating…
@@ -763,6 +840,20 @@ function ReportsTab() {
                     )}
                   </div>
                 </div>
+                <AnimatePresence>
+                  {expandedNotes.has(report.id) && (
+                    <motion.div
+                      key="notes"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <InternalNotes reportId={report.id} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             ))}
       </div>

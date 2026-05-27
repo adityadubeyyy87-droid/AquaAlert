@@ -1,12 +1,13 @@
 import { Link, useLocation } from "wouter";
 import {
-  Droplet, Map, Trophy, PlusCircle, Radio, Clock, Shield,
-  User, HelpCircle,
+  Droplet, Map, Trophy, PlusCircle, Clock, Shield,
+  User, HelpCircle, Calculator, Radio, Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useGetDashboardSummary } from "@workspace/api-client-react";
+import { useLanguage, type Lang } from "@/contexts/LanguageContext";
 
 function LiveClock() {
   const [time, setTime] = useState(new Date());
@@ -42,19 +43,46 @@ function ImpactTicker() {
   );
 }
 
-const PUBLIC_NAV = [
-  { href: "/",             label: "Live Map",     icon: Map,        desc: "Real-time pins"  },
-  { href: "/leaderboard",  label: "Leaderboard",  icon: Trophy,     desc: "Civic champions" },
-  { href: "/my-reports",   label: "My Reports",   icon: User,       desc: "Your submissions" },
-  { href: "/how-it-works", label: "How It Works", icon: HelpCircle, desc: "3-step guide"    },
-];
-
-const ADMIN_NAV = [
-  { href: "/admin", label: "Municipality", icon: Shield, desc: "Command center" },
-];
+function LanguageToggle() {
+  const { lang, setLang } = useLanguage();
+  const langs: { code: Lang; label: string }[] = [
+    { code: "en", label: "EN" },
+    { code: "hi", label: "हि" },
+    { code: "mr", label: "म" },
+  ];
+  return (
+    <div className="mx-4 mb-3 px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800/50 flex items-center gap-2">
+      <Globe className="w-3.5 h-3.5 text-slate-600 flex-shrink-0" />
+      <div className="flex gap-1 flex-1">
+        {langs.map(l => (
+          <button key={l.code} onClick={() => setLang(l.code)}
+            className={`flex-1 text-center text-[11px] font-bold py-1 rounded-lg transition-all ${
+              lang === l.code
+                ? "bg-cyan-700/60 text-cyan-300 border border-cyan-700/60"
+                : "text-slate-500 hover:text-slate-300 border border-transparent"
+            }`}>
+            {l.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const { t } = useLanguage();
+
+  const PUBLIC_NAV = [
+    { href: "/",                label: t("liveMap"),      icon: Map,        desc: t("realTimePins")    },
+    { href: "/leaderboard",     label: t("leaderboard"),  icon: Trophy,     desc: t("civicChampions")  },
+    { href: "/my-reports",      label: t("myReports"),    icon: User,       desc: t("yourSubmissions") },
+    { href: "/how-it-works",    label: t("howItWorks"),   icon: HelpCircle, desc: t("threeStepGuide")  },
+    { href: "/water-calculator",label: t("waterCalc"),    icon: Calculator, desc: t("waterWaste")      },
+  ];
+  const ADMIN_NAV = [
+    { href: "/admin", label: t("municipality"), icon: Shield, desc: t("commandCenter") },
+  ];
 
   const isActive = (href: string) =>
     href === "/" ? location === "/" : location === href || location.startsWith(href + "/");
@@ -62,12 +90,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const NavItem = ({ item, i }: { item: typeof PUBLIC_NAV[0]; i: number }) => {
     const active = isActive(item.href);
     return (
-      <motion.div
-        custom={i}
-        initial={{ x: -12, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ delay: i * 0.05, duration: 0.22 }}
-      >
+      <motion.div custom={i} initial={{ x: -12, opacity: 0 }} animate={{ x: 0, opacity: 1 }}
+        transition={{ delay: i * 0.05, duration: 0.22 }}>
         <Link href={item.href}>
           <div className={cn(
             "relative flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer group border",
@@ -94,7 +118,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen w-full bg-slate-950 text-slate-50 overflow-hidden font-sans">
-      {/* Sidebar */}
       <motion.aside
         initial={{ x: -20, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
@@ -118,23 +141,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
           </span>
-          <span className="text-xs font-semibold text-green-400">System Live</span>
+          <span className="text-xs font-semibold text-green-400">{t("systemLive")}</span>
           <Radio className="w-3 h-3 text-green-500 ml-auto" />
         </div>
 
         <LiveClock />
 
-        {/* Public nav */}
+        {/* Nav */}
         <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
           {PUBLIC_NAV.map((item, i) => <NavItem key={item.href} item={item} i={i} />)}
-
-          {/* Divider */}
           <div className="my-2 mx-2 border-t border-slate-800/60" />
-
-          {/* Admin nav */}
           {ADMIN_NAV.map((item, i) => <NavItem key={item.href} item={item} i={PUBLIC_NAV.length + 1 + i} />)}
         </nav>
 
+        <LanguageToggle />
         <ImpactTicker />
 
         {/* CTA */}
@@ -143,14 +163,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               className="flex items-center justify-center w-full bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_28px_rgba(6,182,212,0.5)] cursor-pointer gap-2">
               <PlusCircle className="w-4 h-4" />
-              Report a Leak
+              {t("reportALeak")}
             </motion.div>
           </Link>
-          <p className="text-[10px] text-center text-slate-600 mt-2">Earn Eco Points for every report</p>
+          <p className="text-[10px] text-center text-slate-600 mt-2">{t("earnEcoPoints")}</p>
         </div>
       </motion.aside>
 
-      {/* Main */}
       <main className="flex-1 relative overflow-hidden bg-slate-950">{children}</main>
     </div>
   );
