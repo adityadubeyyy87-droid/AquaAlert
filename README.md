@@ -65,7 +65,7 @@ A **contract-first, full-stack civic platform** that transforms passive bystande
 ### 📝 Report Submission
 
 
-![Report Form](attached_assets/screenshot_report.png)
+![Report Form](https://github.com/adityadubeyyy87-droid/AquaAlert/blob/2580b20ac6ba7b99e1e6a87e22ba9dc77753ed40/Report%20submission.png)
 
 
 
