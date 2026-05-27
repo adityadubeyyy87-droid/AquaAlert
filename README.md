@@ -46,7 +46,33 @@ A **contract-first, full-stack civic platform** that transforms passive bystande
 | 🏆 Climb the **Civic Champions Leaderboard** | 🔔 Activity feed for field dispatch |
 
 ---
+## 📸 Screenshots
 
+### 🗺️ Live Leak Map
+
+
+![Map View](attached_assets/screenshot_map.png)
+
+
+
+### 📊 Municipal Command Center
+
+
+![Dashboard](attached_assets/screenshot_dashboard.png)
+
+
+
+### 📝 Report Submission
+
+
+![Report Form](attached_assets/screenshot_report.png)
+
+
+
+### 🏆 Civic Champions Leaderboard
+
+
+![Leaderboard](attached_assets/screenshot_leaderboard.png)
 ## 🏗️ Architecture
 
 ```
