@@ -25,11 +25,17 @@ function serializeReport(r: RawReport) {
 const router: IRouter = Router();
 
 router.get("/analytics/summary", async (_req, res): Promise<void> => {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayISO = todayStart.toISOString();
+
   const [counts] = await db
     .select({
       total: sql<number>`count(*)::int`,
       pending: sql<number>`count(*) filter (where status = 'pending')::int`,
+      inProgress: sql<number>`count(*) filter (where status = 'in_progress')::int`,
       resolved: sql<number>`count(*) filter (where status = 'resolved')::int`,
+      resolvedToday: sql<number>`count(*) filter (where status = 'resolved' and resolved_at >= ${todayISO}::timestamptz)::int`,
       critical: sql<number>`count(*) filter (where severity = 'critical')::int`,
       activeWards: sql<number>`count(distinct ward)::int`,
       avgResolutionHours: sql<number>`
@@ -56,7 +62,9 @@ router.get("/analytics/summary", async (_req, res): Promise<void> => {
   const summary = {
     totalReports,
     pendingReports: counts?.pending ?? 0,
+    inProgressReports: counts?.inProgress ?? 0,
     resolvedReports,
+    resolvedToday: counts?.resolvedToday ?? 0,
     criticalReports: counts?.critical ?? 0,
     totalEcoPoints: pointsRow?.totalEcoPoints ?? 0,
     activeWards: counts?.activeWards ?? 0,

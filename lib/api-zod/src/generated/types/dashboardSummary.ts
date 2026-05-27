@@ -9,7 +9,9 @@
 export interface DashboardSummary {
   totalReports: number;
   pendingReports: number;
+  inProgressReports: number;
   resolvedReports: number;
+  resolvedToday: number;
   criticalReports: number;
   totalEcoPoints: number;
   activeWards: number;

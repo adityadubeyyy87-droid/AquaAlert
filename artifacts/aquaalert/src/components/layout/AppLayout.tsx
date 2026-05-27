@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import {
-  Droplet, Map, Trophy, List, PlusCircle, Radio, Clock, Shield,
+  Droplet, Map, Trophy, PlusCircle, Radio, Clock, Shield,
   User, HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -43,11 +43,10 @@ function ImpactTicker() {
 }
 
 const PUBLIC_NAV = [
-  { href: "/",              label: "Live Map",       icon: Map,        desc: "Real-time pins"     },
-  { href: "/reports",       label: "All Reports",    icon: List,       desc: "Report directory"   },
-  { href: "/leaderboard",   label: "Leaderboard",    icon: Trophy,     desc: "Civic champions"    },
-  { href: "/my-reports",    label: "My Reports",     icon: User,       desc: "Your submissions"   },
-  { href: "/how-it-works",  label: "How It Works",   icon: HelpCircle, desc: "3-step guide"       },
+  { href: "/",             label: "Live Map",     icon: Map,        desc: "Real-time pins"  },
+  { href: "/leaderboard",  label: "Leaderboard",  icon: Trophy,     desc: "Civic champions" },
+  { href: "/my-reports",   label: "My Reports",   icon: User,       desc: "Your submissions" },
+  { href: "/how-it-works", label: "How It Works", icon: HelpCircle, desc: "3-step guide"    },
 ];
 
 const ADMIN_NAV = [

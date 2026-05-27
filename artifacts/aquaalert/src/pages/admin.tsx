@@ -27,8 +27,8 @@ import {
 import {
   Shield, LogOut, Droplet, AlertCircle, CheckCircle2, Clock, MapPin, Search,
   RefreshCw, ChevronDown, Activity, Zap, Droplets, AlertTriangle, CheckCircle,
-  TrendingUp, TrendingDown, Minus, List, BarChart2, Trophy, Download, Thermometer,
-  ChevronUp, Star, Flame,
+  TrendingUp, Minus, List, BarChart2, Trophy, Download, Thermometer,
+  ChevronUp, Star, Flame, Phone, Mail, Users, BookOpen, Building2,
 } from "lucide-react";
 
 const ADMIN_ID       = "Aditya@1234";
@@ -44,11 +44,12 @@ const CHART_STYLE = {
 };
 
 const TABS = [
-  { key: "overview",   label: "Overview",    icon: BarChart2 },
-  { key: "reports",    label: "All Reports",  icon: List },
-  { key: "heatmap",   label: "Heatmap",      icon: Thermometer },
-  { key: "leaderboard",label: "Leaderboard", icon: Trophy },
-  { key: "export",    label: "Export",       icon: Download },
+  { key: "overview",    label: "Overview",     icon: BarChart2  },
+  { key: "reports",     label: "All Reports",   icon: List       },
+  { key: "heatmap",    label: "Heatmap",        icon: Thermometer },
+  { key: "leaderboard", label: "Leaderboard",   icon: Trophy     },
+  { key: "directory",  label: "Directory",      icon: BookOpen   },
+  { key: "export",     label: "Export",         icon: Download   },
 ] as const;
 type Tab = typeof TABS[number]["key"];
 
@@ -178,7 +179,11 @@ function OverviewTab() {
     const d = subDays(new Date(), 6 - i);
     const dayStr = d.toDateString();
     const dayReports = (allReports ?? []).filter(r => new Date(r.createdAt).toDateString() === dayStr);
-    return { day: format(d, "EEE"), reports: dayReports.length, critical: dayReports.filter(r => r.severity === "critical").length };
+    return {
+      day: format(d, "EEE"),
+      reports: dayReports.length,
+      critical: dayReports.filter(r => r.severity === "critical").length,
+    };
   }), [allReports]);
 
   const severityData = (severityStats ?? []).map(s => ({
@@ -186,44 +191,107 @@ function OverviewTab() {
     count: s.count,
     color: SEVERITY_COLORS[s.severity as keyof typeof SEVERITY_COLORS] ?? SEVERITY_COLORS.low,
   }));
+
   const statusData = (statusStats ?? []).map(s => ({
-    name: s.status.replace("_", " ").replace(/\b\w/g, l => l.toUpperCase()),
+    name: fmt(s.status),
     value: s.count,
     color: STATUS_COLORS[s.status as keyof typeof STATUS_COLORS] ?? STATUS_COLORS.pending,
   }));
+
   const maxWardCritical = Math.max(1, ...(wards ?? []).map(w => w.criticalReports));
-  const resolutionRate  = summary ? Math.round((summary.resolvedReports / (summary.totalReports || 1)) * 100) : 0;
-  const skelVal = <Skeleton className="h-10 w-16" />;
+  const sk = <Skeleton className="h-10 w-16" />;
 
   const statCards = [
-    { title: "Active Leaks",       value: summary?.pendingReports,       icon: Droplets,      color: "bg-cyan-950/50 text-cyan-400",   tag: "Pending resolution",         trend: null },
-    { title: "Critical Incidents", value: summary?.criticalReports,      icon: AlertTriangle, color: "bg-red-950/50 text-red-400",    tag: "Immediate dispatch",          trend: "up"  },
-    { title: "Total Resolved",     value: summary?.resolvedReports,      icon: CheckCircle,   color: "bg-green-950/50 text-green-400", tag: `${resolutionRate}% rate`,    trend: "up"  },
-    { title: "NRW Saved (Est.)",   value: summary?.nrwReductionEstimate, icon: Activity,      color: "bg-blue-950/50 text-blue-400",   tag: "@ 0.5 KL per resolved",     suffix: "L", trend: null },
+    {
+      title: "Total Reports",
+      value: summary?.totalReports,
+      icon: Activity,
+      colorClass: "bg-slate-800/80 text-slate-300",
+      tag: "All submitted reports",
+      note: null,
+    },
+    {
+      title: "Pending",
+      value: summary?.pendingReports,
+      icon: Clock,
+      colorClass: "bg-amber-950/60 text-amber-400",
+      tag: "Awaiting action",
+      note: null,
+    },
+    {
+      title: "In Progress",
+      value: summary?.inProgressReports,
+      icon: Droplets,
+      colorClass: "bg-blue-950/60 text-blue-400",
+      tag: "Field teams dispatched",
+      note: null,
+    },
+    {
+      title: "Resolved Today",
+      value: summary?.resolvedToday,
+      icon: CheckCircle,
+      colorClass: "bg-green-950/60 text-green-400",
+      tag: format(new Date(), "d MMM yyyy"),
+      note: null,
+    },
+    {
+      title: "Avg Resolution",
+      value: summary?.avgResolutionHours,
+      icon: TrendingUp,
+      colorClass: "bg-purple-950/60 text-purple-400",
+      tag: summary?.resolvedReports ? `across ${summary.resolvedReports} resolved` : "No resolved reports yet",
+      suffix: "h",
+      note: null,
+    },
+    {
+      title: "Critical Active",
+      value: summary?.criticalReports,
+      icon: AlertTriangle,
+      colorClass: "bg-red-950/60 text-red-400",
+      tag: "Immediate dispatch needed",
+      note: (summary?.criticalReports ?? 0) > 0 ? "urgent" : null,
+    },
   ];
 
-  const cv = { hidden: { opacity: 0, y: 14 }, visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.08, duration: 0.3 } }) };
+  const cv = {
+    hidden: { opacity: 0, y: 14 },
+    visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.07, duration: 0.28 } }),
+  };
 
   return (
     <div className="space-y-7">
-      {/* Stat cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+
+      {/* Live data note */}
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-900/60 border border-slate-800 w-fit text-xs text-slate-500">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500" />
+        </span>
+        All numbers are computed live from actual report data · Auto-refreshes every 60 s
+      </div>
+
+      {/* Primary stat cards — 3 columns on desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         {statCards.map((s, i) => (
           <motion.div key={s.title} custom={i} variants={cv} initial="hidden" animate="visible">
-            <Card className="bg-slate-900 border-slate-800 overflow-hidden relative h-full">
-              <div className="absolute inset-0 opacity-[0.025] bg-gradient-to-br from-white to-transparent pointer-events-none" />
-              <CardContent className="p-6">
+            <Card className={`bg-slate-900 border-slate-800 relative overflow-hidden h-full ${s.note === "urgent" ? "border-red-900/60 shadow-[0_0_20px_rgba(239,68,68,0.08)]" : ""}`}>
+              {s.note === "urgent" && (
+                <span className="absolute top-3 right-3 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+                </span>
+              )}
+              <CardContent className="p-5">
                 <div className="flex items-start justify-between mb-3">
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{s.title}</p>
-                  <div className={`p-3 rounded-xl ${s.color} flex-shrink-0`}><s.icon className="w-4 h-4" /></div>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-tight">{s.title}</p>
+                  <div className={`p-2.5 rounded-xl flex-shrink-0 ${s.colorClass}`}>
+                    <s.icon className="w-3.5 h-3.5" />
+                  </div>
                 </div>
                 <div className="text-4xl font-black text-slate-100 tabular-nums mb-1">
-                  {s.value === undefined ? skelVal : <AnimatedStat value={s.value} suffix={(s as any).suffix} />}
+                  {s.value === undefined ? sk : <AnimatedStat value={s.value} suffix={(s as any).suffix} />}
                 </div>
-                <div className="flex items-center gap-1 mt-2 pt-2 border-t border-slate-800">
-                  {s.trend === "up" ? <TrendingUp className="w-3 h-3 text-green-400" /> : <Minus className="w-3 h-3 text-slate-600" />}
-                  <span className="text-[11px] text-slate-500">{s.tag}</span>
-                </div>
+                <p className="text-[11px] text-slate-600 mt-2 pt-2 border-t border-slate-800">{s.tag}</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -231,7 +299,7 @@ function OverviewTab() {
       </div>
 
       {/* 7-day trend */}
-      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
         <Card className="bg-slate-900 border-slate-800">
           <CardHeader className="border-b border-slate-800 py-4 px-6">
             <CardTitle className="text-sm font-semibold text-slate-300 flex items-center gap-2">
@@ -265,9 +333,9 @@ function OverviewTab() {
         </Card>
       </motion.div>
 
-      {/* Ward table + charts */}
+      {/* Ward table + breakdown charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.42 }} className="lg:col-span-2">
+        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.52 }} className="lg:col-span-2">
           <Card className="bg-slate-900 border-slate-800 h-full">
             <CardHeader className="border-b border-slate-800 py-4 px-6">
               <CardTitle className="text-sm font-semibold text-slate-300">Ward-wise Distribution</CardTitle>
@@ -278,7 +346,7 @@ function OverviewTab() {
                   <TableHeader className="sticky top-0 bg-slate-900 z-10">
                     <TableRow className="border-slate-800 hover:bg-transparent">
                       <TableHead className="pl-6 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ward / Zone</TableHead>
-                      <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Active</TableHead>
+                      <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">Pending</TableHead>
                       <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Critical</TableHead>
                       <TableHead className="text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right pr-6">Resolved</TableHead>
                     </TableRow>
@@ -293,10 +361,10 @@ function OverviewTab() {
                             <TableCell className="pr-6"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
                           </TableRow>
                         ))
-                      : wards?.map(ward => (
+                      : (wards ?? []).map(ward => (
                           <TableRow key={ward.ward} className="border-slate-800 hover:bg-slate-800/30 transition-colors">
                             <TableCell className="pl-6 font-semibold text-slate-200">{ward.ward}</TableCell>
-                            <TableCell className="text-right font-bold text-cyan-400 tabular-nums">{ward.pendingReports}</TableCell>
+                            <TableCell className="text-right font-bold text-amber-400 tabular-nums">{ward.pendingReports}</TableCell>
                             <TableCell className="w-44">
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
@@ -318,7 +386,7 @@ function OverviewTab() {
           </Card>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.48 }} className="space-y-5">
+        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.56 }} className="space-y-5">
           <Card className="bg-slate-900 border-slate-800">
             <CardHeader className="border-b border-slate-800 py-3 px-5">
               <CardTitle className="text-sm font-semibold text-slate-300">Severity Breakdown</CardTitle>
@@ -363,26 +431,13 @@ function OverviewTab() {
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-2">
                 <Droplets className="w-4 h-4 text-blue-400" />
-                <h4 className="text-sm font-bold text-slate-300">Impact Equivalent</h4>
+                <h4 className="text-sm font-bold text-slate-300">NRW Impact</h4>
               </div>
-              <p className="text-xs text-slate-500 mb-3">
-                <span className="text-blue-400 font-bold">{isSummaryLoading ? "—" : summary?.nrwReductionEstimate ?? 0}L</span> recovered equals…
-              </p>
-              {summary && (
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { v: Math.round(summary.nrwReductionEstimate / 15), u: "buckets", e: "🪣" },
-                    { v: Math.round(summary.nrwReductionEstimate / 2),  u: "days water", e: "💧" },
-                    { v: Math.round(summary.nrwReductionEstimate / 25), u: "families", e: "🏠" },
-                  ].map(({ v, u, e }) => (
-                    <div key={u} className="bg-slate-950/60 rounded-xl p-2.5 text-center border border-slate-800/40">
-                      <div className="text-lg mb-0.5">{e}</div>
-                      <div className="text-base font-black text-blue-400 tabular-nums">{v}</div>
-                      <div className="text-[9px] text-slate-500">{u}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div className="text-3xl font-black text-blue-400 tabular-nums mb-1">
+                {isSummaryLoading ? <Skeleton className="h-8 w-20" /> : `${summary?.nrwReductionEstimate ?? 0}L`}
+              </div>
+              <p className="text-[11px] text-slate-500">non-revenue water recovered</p>
+              <p className="text-[10px] text-slate-600 mt-1">@ 0.5 KL per resolved report</p>
             </CardContent>
           </Card>
         </motion.div>
@@ -415,7 +470,7 @@ function ReportsTab() {
         toast({
           title: data.status === "resolved" ? "✓ Report Resolved" : "Status Updated",
           description: data.status === "resolved"
-            ? "Removed from the public map and feed."
+            ? "Removed from the public map and feed instantly."
             : `Status changed to ${fmt(data.status)}.`,
         });
       },
@@ -427,7 +482,7 @@ function ReportsTab() {
   });
 
   const filtered = (reports ?? []).filter((r: Report) => {
-    const ms = search === "" || r.title.toLowerCase().includes(search.toLowerCase()) || r.ward.toLowerCase().includes(search.toLowerCase()) || r.id.toString().includes(search);
+    const ms  = search === "" || r.title.toLowerCase().includes(search.toLowerCase()) || r.ward.toLowerCase().includes(search.toLowerCase()) || r.id.toString().includes(search) || (r.reporterName ?? "").toLowerCase().includes(search.toLowerCase());
     const mst = statusFilter === "all" || r.status === statusFilter;
     const msv = severityFilter === "all" || r.severity === severityFilter;
     return ms && mst && msv;
@@ -438,23 +493,33 @@ function ReportsTab() {
       <div className="flex flex-col md:flex-row gap-3 p-4 bg-slate-900/80 border border-slate-800 rounded-2xl">
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <Input placeholder="Search by title, ward, or report ID…" value={search} onChange={e => setSearch(e.target.value)}
-            className="pl-10 bg-slate-950 border-slate-800 text-slate-100 focus:border-cyan-600 focus:ring-0 rounded-xl h-10" />
+          <Input
+            placeholder="Search by title, ward, reporter name, or ID…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-10 bg-slate-950 border-slate-800 text-slate-100 focus:border-cyan-600 focus:ring-0 rounded-xl h-10"
+          />
         </div>
         <div className="flex gap-3">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[148px] bg-slate-950 border-slate-800 text-slate-300 rounded-xl h-10"><SelectValue placeholder="All Statuses" /></SelectTrigger>
+            <SelectTrigger className="w-[148px] bg-slate-950 border-slate-800 text-slate-300 rounded-xl h-10">
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
             <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
               <SelectItem value="all">All Statuses</SelectItem>
               {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{fmt(s)}</SelectItem>)}
             </SelectContent>
           </Select>
           <Select value={severityFilter} onValueChange={setSeverityFilter}>
-            <SelectTrigger className="w-[148px] bg-slate-950 border-slate-800 text-slate-300 rounded-xl h-10"><SelectValue placeholder="All Severities" /></SelectTrigger>
+            <SelectTrigger className="w-[148px] bg-slate-950 border-slate-800 text-slate-300 rounded-xl h-10">
+              <SelectValue placeholder="All Severities" />
+            </SelectTrigger>
             <SelectContent className="bg-slate-900 border-slate-800 text-slate-200">
               <SelectItem value="all">All Severities</SelectItem>
               {SEVERITY_OPTIONS.map(s => (
-                <SelectItem key={s} value={s} style={{ color: SEVERITY_COLORS[s] }}>{s.charAt(0).toUpperCase() + s.slice(1)}</SelectItem>
+                <SelectItem key={s} value={s} style={{ color: SEVERITY_COLORS[s] }}>
+                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -464,70 +529,108 @@ function ReportsTab() {
         </div>
       </div>
 
-      {!isLoading && filtered.length > 0 && (
+      {!isLoading && (
         <div className="text-xs text-slate-500 px-1">
-          Showing <span className="text-slate-300 font-semibold">{filtered.length}</span> of {reports?.length ?? 0} reports
+          Showing <span className="text-slate-300 font-semibold">{filtered.length}</span> of{" "}
+          <span className="text-slate-300 font-semibold">{reports?.length ?? 0}</span> reports
         </div>
       )}
 
       <div className="space-y-2">
-        {isLoading ? Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="p-4 rounded-2xl border border-slate-800 bg-slate-900/60 flex gap-4 items-center">
-            <Skeleton className="h-4 w-32" /><Skeleton className="h-5 w-16 rounded-full" />
-            <Skeleton className="h-4 w-24" /><Skeleton className="h-9 w-40 ml-auto rounded-xl" />
-          </div>
-        )) : filtered.length === 0 ? (
-          <div className="py-20 text-center text-slate-600">
-            <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
-            <p className="font-semibold text-slate-400">No reports match your filters</p>
-          </div>
-        ) : filtered.map((report: Report, idx: number) => (
-          <motion.div key={report.id}
-            initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.18, delay: Math.min(idx * 0.03, 0.5) }}
-            className={`p-4 rounded-2xl border bg-slate-900/60 transition-all ${
-              report.status === "resolved" ? "border-green-900/40 bg-green-950/10"
-              : report.severity === "critical" && report.status !== "rejected" ? "border-red-900/40"
-              : "border-slate-800"}`}
-          >
-            <div className="flex flex-col md:flex-row md:items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                  <span className="text-[10px] font-mono text-slate-600">#{report.id.toString().padStart(5, "0")}</span>
-                  <SeverityBadge severity={report.severity} />
-                  <StatusBadge status={report.status} />
-                </div>
-                <h3 className="font-bold text-slate-100 text-sm leading-snug mb-1">{report.title}</h3>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
-                  <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{report.ward}</span>
-                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatDistanceToNow(new Date(report.createdAt), { addSuffix: true })}</span>
-                  <span>{format(new Date(report.createdAt), "MMM d, yyyy")}</span>
-                  <span className="text-slate-600">▲ {report.upvotes} verifications</span>
-                  {report.reporterName && <span className="text-slate-600">by {report.reporterName}</span>}
-                </div>
+        {isLoading
+          ? Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="p-4 rounded-2xl border border-slate-800 bg-slate-900/60 flex gap-4 items-center">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-9 w-40 ml-auto rounded-xl" />
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {updatingId === report.id ? (
-                  <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 text-slate-400 text-xs">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Updating…
+            ))
+          : filtered.length === 0
+          ? (
+              <div className="py-20 text-center text-slate-600">
+                <Search className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                <p className="font-semibold text-slate-400">No reports match your filters</p>
+              </div>
+            )
+          : filtered.map((report: Report, idx: number) => (
+              <motion.div
+                key={report.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.18, delay: Math.min(idx * 0.03, 0.5) }}
+                className={`p-4 rounded-2xl border bg-slate-900/60 transition-all ${
+                  report.status === "resolved"
+                    ? "border-green-900/40 bg-green-950/10"
+                    : report.severity === "critical" && report.status !== "rejected"
+                    ? "border-red-900/40"
+                    : "border-slate-800"
+                }`}
+              >
+                <div className="flex flex-col md:flex-row md:items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                      <span className="text-[10px] font-mono text-slate-600">#{report.id.toString().padStart(5, "0")}</span>
+                      <SeverityBadge severity={report.severity} />
+                      <StatusBadge status={report.status} />
+                    </div>
+                    <h3 className="font-bold text-slate-100 text-sm leading-snug mb-1.5">{report.title}</h3>
+                    {report.description && (
+                      <p className="text-xs text-slate-500 leading-relaxed mb-1.5 line-clamp-2">{report.description}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{report.ward}</span>
+                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatDistanceToNow(new Date(report.createdAt), { addSuffix: true })}</span>
+                      <span>{format(new Date(report.createdAt), "d MMM yyyy, h:mm a")}</span>
+                      {report.reporterName && <span className="text-slate-500">Reporter: <span className="text-slate-300">{report.reporterName}</span></span>}
+                      <span className="text-slate-600">▲ {report.upvotes} verifications</span>
+                    </div>
+                    {report.status === "resolved" && report.resolvedAt && (
+                      <div className="mt-1.5 flex items-center gap-1.5 text-xs text-emerald-400">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Resolved {formatDistanceToNow(new Date(report.resolvedAt), { addSuffix: true })}
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <Select value={report.status} onValueChange={v => { setUpdatingId(report.id); updateMutation.mutate({ id: report.id, data: { status: v as ReportUpdateStatus } }); }} disabled={updatingId !== null}>
-                    <SelectTrigger className="w-[176px] rounded-xl h-9 text-xs font-bold border-2"
-                      style={{ borderColor: `${STATUS_COLORS[report.status as keyof typeof STATUS_COLORS]}60`, color: STATUS_COLORS[report.status as keyof typeof STATUS_COLORS], backgroundColor: `${STATUS_COLORS[report.status as keyof typeof STATUS_COLORS]}12` }}>
-                      <SelectValue /><ChevronDown className="w-3.5 h-3.5 ml-auto opacity-60" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-900 border-slate-800">
-                      {STATUS_OPTIONS.map(s => (
-                        <SelectItem key={s} value={s} className="text-xs font-semibold" style={{ color: STATUS_COLORS[s as keyof typeof STATUS_COLORS] }}>{fmt(s)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        ))}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {updatingId === report.id ? (
+                      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 text-slate-400 text-xs">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Updating…
+                      </div>
+                    ) : (
+                      <Select
+                        value={report.status}
+                        onValueChange={v => {
+                          setUpdatingId(report.id);
+                          updateMutation.mutate({ id: report.id, data: { status: v as ReportUpdateStatus } });
+                        }}
+                        disabled={updatingId !== null}
+                      >
+                        <SelectTrigger
+                          className="w-[176px] rounded-xl h-9 text-xs font-bold border-2"
+                          style={{
+                            borderColor: `${STATUS_COLORS[report.status as keyof typeof STATUS_COLORS]}60`,
+                            color: STATUS_COLORS[report.status as keyof typeof STATUS_COLORS],
+                            backgroundColor: `${STATUS_COLORS[report.status as keyof typeof STATUS_COLORS]}12`,
+                          }}
+                        >
+                          <SelectValue />
+                          <ChevronDown className="w-3.5 h-3.5 ml-auto opacity-60" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-slate-800">
+                          {STATUS_OPTIONS.map(s => (
+                            <SelectItem key={s} value={s} className="text-xs font-semibold"
+                              style={{ color: STATUS_COLORS[s as keyof typeof STATUS_COLORS] }}>
+                              {fmt(s)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
       </div>
     </div>
   );
@@ -543,12 +646,12 @@ function HeatmapTab() {
     const maxTotal = Math.max(1, ...wards.map(w => w.pendingReports + w.resolvedReports));
     return wards
       .map(w => {
-        const total   = w.pendingReports + w.resolvedReports;
+        const total     = w.pendingReports + w.resolvedReports;
         const critRatio = w.criticalReports / Math.max(1, total);
         const intensity = total / maxTotal;
         const heatScore = Math.round((critRatio * 0.6 + intensity * 0.4) * 100);
-        const hue = Math.round(120 - heatScore * 1.2);
-        const color = `hsl(${hue}, 70%, 50%)`;
+        const hue       = Math.round(120 - heatScore * 1.2);
+        const color     = `hsl(${hue}, 70%, 50%)`;
         return { ...w, total, critRatio, intensity, heatScore, color };
       })
       .sort((a, b) => b.heatScore - a.heatScore);
@@ -558,7 +661,7 @@ function HeatmapTab() {
 
   if (isLoading) return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-      {Array.from({ length: 12 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+      {Array.from({ length: 12 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
     </div>
   );
 
@@ -567,62 +670,56 @@ function HeatmapTab() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-slate-200">Leak Density Heatmap</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Wards ranked by intensity score — combines report volume and critical severity ratio.</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Wards ranked by intensity score — combines report volume and critical severity ratio. Use this to prioritise field dispatch.
+          </p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-sm bg-green-500 inline-block opacity-70" />Low
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-sm bg-yellow-500 inline-block opacity-70" />Medium
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-sm bg-red-500 inline-block opacity-70" />High
-          </div>
+        <div className="hidden md:flex items-center gap-3 text-xs text-slate-500">
+          {[["#22c55e", "Low"], ["#eab308", "Medium"], ["#ef4444", "High"]].map(([c, l]) => (
+            <div key={l} className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-sm inline-block opacity-80" style={{ backgroundColor: c }} />{l}
+            </div>
+          ))}
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {heatData.map((ward, i) => {
-          const barW = `${(ward.heatScore / maxScore) * 100}%`;
-          return (
-            <motion.div key={ward.ward}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.04, duration: 0.25 }}
-              className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors relative overflow-hidden"
-            >
-              <div className="absolute inset-0 opacity-[0.06] rounded-2xl" style={{ backgroundColor: ward.color }} />
-              <div className="relative z-10">
-                <div className="flex items-start justify-between mb-2">
-                  <span className="text-[10px] font-black text-slate-600">#{i + 1}</span>
-                  <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md"
-                    style={{ backgroundColor: `${ward.color}25`, color: ward.color }}>
-                    {ward.heatScore}
-                  </span>
+        {heatData.map((ward, i) => (
+          <motion.div key={ward.ward}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: i * 0.04, duration: 0.25 }}
+            className="p-4 rounded-2xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition-colors relative overflow-hidden"
+          >
+            <div className="absolute inset-0 opacity-[0.06] rounded-2xl" style={{ backgroundColor: ward.color }} />
+            <div className="relative z-10">
+              <div className="flex items-start justify-between mb-2">
+                <span className="text-[10px] font-black text-slate-600">#{i + 1}</span>
+                <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md"
+                  style={{ backgroundColor: `${ward.color}25`, color: ward.color }}>
+                  {ward.heatScore}
+                </span>
+              </div>
+              <h4 className="text-xs font-bold text-slate-200 leading-tight mb-2">{ward.ward}</h4>
+              <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden mb-2">
+                <motion.div className="h-full rounded-full" style={{ backgroundColor: ward.color }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(ward.heatScore / maxScore) * 100}%` }}
+                  transition={{ duration: 0.7, ease: "easeOut", delay: i * 0.04 + 0.3 }} />
+              </div>
+              <div className="grid grid-cols-2 gap-1.5">
+                <div className="text-center">
+                  <div className="text-sm font-black text-slate-200 tabular-nums">{ward.pendingReports}</div>
+                  <div className="text-[9px] text-slate-600">Active</div>
                 </div>
-                <h4 className="text-xs font-bold text-slate-200 leading-tight mb-2">{ward.ward}</h4>
-                <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden mb-2">
-                  <motion.div className="h-full rounded-full"
-                    style={{ backgroundColor: ward.color }}
-                    initial={{ width: 0 }}
-                    animate={{ width: barW }}
-                    transition={{ duration: 0.7, ease: "easeOut", delay: i * 0.04 + 0.3 }} />
-                </div>
-                <div className="grid grid-cols-2 gap-1.5">
-                  <div className="text-center">
-                    <div className="text-sm font-black text-slate-200 tabular-nums">{ward.pendingReports}</div>
-                    <div className="text-[9px] text-slate-600">Active</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm font-black tabular-nums" style={{ color: SEVERITY_COLORS.critical }}>{ward.criticalReports}</div>
-                    <div className="text-[9px] text-slate-600">Critical</div>
-                  </div>
+                <div className="text-center">
+                  <div className="text-sm font-black tabular-nums" style={{ color: SEVERITY_COLORS.critical }}>{ward.criticalReports}</div>
+                  <div className="text-[9px] text-slate-600">Critical</div>
                 </div>
               </div>
-            </motion.div>
-          );
-        })}
+            </div>
+          </motion.div>
+        ))}
       </div>
 
       {heatData.length === 0 && (
@@ -644,7 +741,9 @@ function LeaderboardTab() {
     <div className="space-y-3">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="flex items-center gap-4 p-4 rounded-2xl border border-slate-800 bg-slate-900/60">
-          <Skeleton className="w-9 h-9 rounded-full" /><Skeleton className="h-4 w-40 flex-1" /><Skeleton className="h-4 w-16" />
+          <Skeleton className="w-9 h-9 rounded-full" />
+          <Skeleton className="h-4 w-40 flex-1" />
+          <Skeleton className="h-4 w-16" />
         </div>
       ))}
     </div>
@@ -654,9 +753,8 @@ function LeaderboardTab() {
     <div className="space-y-5">
       <div>
         <h2 className="text-base font-bold text-slate-200 mb-1">Top Citizen Reporters</h2>
-        <p className="text-xs text-slate-500">Citizens ranked by Eco Points. Consider reaching out to top contributors for civic recognition.</p>
+        <p className="text-xs text-slate-500">Ranked by Eco Points. Consider acknowledging top contributors for civic engagement.</p>
       </div>
-
       <Card className="bg-slate-900 border-slate-800 overflow-hidden">
         <CardContent className="p-0">
           <div className="divide-y divide-slate-800/60">
@@ -664,10 +762,10 @@ function LeaderboardTab() {
               const tier  = getBadgeTier(user.ecoPoints);
               const color = getBadgeColor(tier);
               const next  = getNextTierInfo(user.ecoPoints);
-              const rankIcon = i === 0 ? <Trophy className="w-4 h-4 text-yellow-400" />
-                             : i === 1 ? <Star className="w-4 h-4 text-slate-300" />
-                             : i === 2 ? <Flame className="w-4 h-4 text-amber-500" />
-                             : null;
+              const icon  = i === 0 ? <Trophy className="w-4 h-4 text-yellow-400" />
+                          : i === 1 ? <Star   className="w-4 h-4 text-slate-300" />
+                          : i === 2 ? <Flame  className="w-4 h-4 text-amber-500" />
+                          : null;
               return (
                 <motion.div key={user.id}
                   initial={{ opacity: 0, x: -10 }}
@@ -676,7 +774,7 @@ function LeaderboardTab() {
                   className="flex items-center gap-4 px-6 py-4 hover:bg-slate-800/30 transition-colors"
                 >
                   <div className="w-6 text-center">
-                    {rankIcon ?? <span className="text-sm font-black text-slate-600">{i + 1}</span>}
+                    {icon ?? <span className="text-sm font-black text-slate-600">{i + 1}</span>}
                   </div>
                   <Avatar className="w-9 h-9 border border-slate-700 flex-shrink-0">
                     <AvatarFallback className="bg-slate-800 text-slate-300 text-xs font-bold">
@@ -689,7 +787,7 @@ function LeaderboardTab() {
                       <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${color}`}>{tier}</span>
                     </div>
                     <div className="text-xs text-slate-500 flex items-center gap-3">
-                      <span>{user.reportsSubmitted} reports</span>
+                      <span>{user.reportsSubmitted} reports submitted</span>
                       <span className="text-green-400">{user.reportsVerified} verified</span>
                     </div>
                     {next.tier !== "Max" && (
@@ -717,6 +815,235 @@ function LeaderboardTab() {
   );
 }
 
+// ── TAB: DIRECTORY ────────────────────────────────────────────────────────────
+
+const ZONES = [
+  {
+    zone: "City Zone (Island City)",
+    wards: ["A Ward", "B Ward", "C Ward", "D Ward"],
+    engineer: "Ramesh Patil",
+    phone: "+91 22 2369 7000",
+    email: "city.hydraulic@mcgm.gov.in",
+    teams: 3,
+  },
+  {
+    zone: "Western Suburbs — North",
+    wards: ["Andheri West", "Andheri East", "Jogeshwari"],
+    engineer: "Suresh Nair",
+    phone: "+91 22 2631 4400",
+    email: "ws.north.hydraulic@mcgm.gov.in",
+    teams: 4,
+  },
+  {
+    zone: "Western Suburbs — South",
+    wards: ["Bandra West", "Bandra East", "Santacruz East", "Santacruz West", "Khar"],
+    engineer: "Meena Kulkarni",
+    phone: "+91 22 2642 9100",
+    email: "ws.south.hydraulic@mcgm.gov.in",
+    teams: 4,
+  },
+  {
+    zone: "Western Suburbs — Far North",
+    wards: ["Borivali", "Kandivali East", "Kandivali West", "Malad East", "Malad West", "Goregaon East", "Goregaon West"],
+    engineer: "Dinesh Shetty",
+    phone: "+91 22 2897 2200",
+    email: "ws.farnorth.hydraulic@mcgm.gov.in",
+    teams: 5,
+  },
+  {
+    zone: "Eastern Suburbs — North",
+    wards: ["Powai", "Vikhroli", "Bhandup", "Mulund"],
+    engineer: "Anjali Sharma",
+    phone: "+91 22 2578 3300",
+    email: "es.north.hydraulic@mcgm.gov.in",
+    teams: 3,
+  },
+  {
+    zone: "Eastern Suburbs — South",
+    wards: ["Ghatkopar", "Chembur", "Kurla", "Dadar"],
+    engineer: "Prakash Desai",
+    phone: "+91 22 2512 8800",
+    email: "es.south.hydraulic@mcgm.gov.in",
+    teams: 4,
+  },
+  {
+    zone: "Southern Mumbai",
+    wards: ["Worli", "Juhu", "Mahim"],
+    engineer: "Kavita Joshi",
+    phone: "+91 22 2437 6600",
+    email: "south.hydraulic@mcgm.gov.in",
+    teams: 3,
+  },
+];
+
+const EMERGENCY = [
+  { label: "BMC Water Helpline",         number: "1916",           desc: "24 × 7 water complaints" },
+  { label: "MCGM Disaster Management",   number: "1800 222 1234",  desc: "Emergency response" },
+  { label: "Hydraulic Engineer HQ",      number: "+91 22 2369 7000", desc: "Main office, Mumbai" },
+  { label: "Sewerage Operations Centre", number: "+91 22 2369 6800", desc: "Mon–Sat 8 am – 8 pm" },
+];
+
+const DEPT = [
+  { dept: "Hydraulic Engineering Dept.",  head: "Chief Engineer (HE)", contact: "he@mcgm.gov.in",         phone: "+91 22 2369 7001" },
+  { dept: "Water Supply Division",        head: "Dy. Commissioner (E&P)", contact: "ws@mcgm.gov.in",      phone: "+91 22 2369 7002" },
+  { dept: "Maintenance & Repairs",        head: "Supt. Engineer (M&R)", contact: "mr@mcgm.gov.in",        phone: "+91 22 2369 7003" },
+  { dept: "Quality Control Lab",          head: "Chemical Analyser",    contact: "qc.lab@mcgm.gov.in",    phone: "+91 22 2369 7004" },
+  { dept: "Complaints & Grievances",      head: "PRO",                  contact: "complaints@mcgm.gov.in", phone: "1916" },
+];
+
+export function DirectoryTab() {
+  const [search, setSearch] = useState("");
+  const lc = search.toLowerCase();
+
+  const filteredZones = ZONES.filter(z =>
+    lc === "" ||
+    z.zone.toLowerCase().includes(lc) ||
+    z.engineer.toLowerCase().includes(lc) ||
+    z.wards.some(w => w.toLowerCase().includes(lc))
+  );
+
+  return (
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h2 className="text-base font-bold text-slate-200 mb-1">Field Directory</h2>
+          <p className="text-xs text-slate-500">Zone-wise hydraulic engineers, field teams, and department contacts. For internal use only.</p>
+        </div>
+        <div className="relative w-full md:w-72">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search zone, ward, or engineer…"
+            className="pl-10 bg-slate-950 border-slate-800 text-slate-100 focus:border-cyan-600 rounded-xl h-9 text-sm"
+          />
+        </div>
+      </div>
+
+      {/* Emergency contacts */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+          <span className="w-1 h-4 bg-red-500 rounded-full" />Emergency Contacts
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {EMERGENCY.map(e => (
+            <Card key={e.label} className="bg-red-950/10 border-red-900/30">
+              <CardContent className="p-4 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-xl bg-red-950/60 border border-red-900/40 flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-4 h-4 text-red-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-slate-200 leading-tight">{e.label}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{e.desc}</p>
+                  <p className="text-sm font-black text-red-400 tabular-nums mt-1">{e.number}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* Zone engineers */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+          <span className="w-1 h-4 bg-cyan-500 rounded-full" />
+          Hydraulic Engineers by Zone
+          {filteredZones.length !== ZONES.length && (
+            <span className="ml-2 text-cyan-500 font-normal normal-case">— {filteredZones.length} of {ZONES.length}</span>
+          )}
+        </h3>
+        <div className="space-y-3">
+          {filteredZones.length === 0 ? (
+            <div className="py-12 text-center text-slate-600">
+              <Building2 className="w-10 h-10 mx-auto mb-3 opacity-20" />
+              <p className="text-slate-400 font-semibold">No zones match your search</p>
+            </div>
+          ) : (
+            filteredZones.map((z, i) => (
+              <motion.div
+                key={z.zone}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.06, duration: 0.2 }}
+              >
+                <Card className="bg-slate-900 border-slate-800">
+                  <CardContent className="p-5">
+                    <div className="flex flex-col md:flex-row md:items-start gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-xl bg-cyan-950/50 border border-cyan-900/40 flex items-center justify-center flex-shrink-0">
+                            <Building2 className="w-4 h-4 text-cyan-400" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-slate-100 leading-tight">{z.zone}</h4>
+                            <p className="text-xs text-slate-500 mt-0.5">Hydraulic Engineer: <span className="text-slate-300 font-semibold">{z.engineer}</span></p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                          {z.wards.map(w => (
+                            <span key={w} className="text-[10px] font-semibold bg-slate-800 text-slate-300 px-2 py-0.5 rounded-lg border border-slate-700/60">{w}</span>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                          <Users className="w-3.5 h-3.5" />
+                          <span>{z.teams} field teams assigned</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 md:items-end shrink-0">
+                        <a href={`tel:${z.phone}`} className="flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-cyan-300 transition-colors">
+                          <Phone className="w-3.5 h-3.5 text-slate-500" />{z.phone}
+                        </a>
+                        <a href={`mailto:${z.email}`} className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-cyan-400 transition-colors">
+                          <Mail className="w-3.5 h-3.5 text-slate-600" />{z.email}
+                        </a>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Department contacts */}
+      <div className="space-y-3">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+          <span className="w-1 h-4 bg-indigo-500 rounded-full" />Department Contacts
+        </h3>
+        <Card className="bg-slate-900 border-slate-800 overflow-hidden">
+          <CardContent className="p-0">
+            <div className="divide-y divide-slate-800/60">
+              {DEPT.map((d, i) => (
+                <motion.div
+                  key={d.dept}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.06, duration: 0.2 }}
+                  className="flex flex-col md:flex-row md:items-center justify-between gap-2 px-5 py-4 hover:bg-slate-800/30 transition-colors"
+                >
+                  <div>
+                    <p className="text-sm font-bold text-slate-200">{d.dept}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Head: {d.head}</p>
+                  </div>
+                  <div className="flex items-center gap-5 text-xs">
+                    <a href={`mailto:${d.contact}`} className="flex items-center gap-1.5 text-slate-400 hover:text-cyan-400 transition-colors">
+                      <Mail className="w-3 h-3" />{d.contact}
+                    </a>
+                    <a href={`tel:${d.phone}`} className="flex items-center gap-1.5 text-slate-400 hover:text-cyan-400 transition-colors">
+                      <Phone className="w-3 h-3" />{d.phone}
+                    </a>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 // ── TAB: EXPORT ──────────────────────────────────────────────────────────────
 
 function ExportTab() {
@@ -726,24 +1053,27 @@ function ExportTab() {
 
   const downloadCSV = () => {
     if (!reports) return;
-    const headers = ["ID", "Title", "Ward", "Severity", "Status", "Reporter", "Upvotes", "Created", "Resolved"];
+    const headers = ["ID", "Title", "Ward", "Severity", "Status", "Reporter", "Description", "Upvotes", "Created", "Resolved"];
     const rows = reports.map(r => [
       r.id,
       `"${r.title.replace(/"/g, '""')}"`,
       `"${r.ward}"`,
       r.severity,
       r.status,
-      `"${r.reporterName ?? ""}"`,
+      `"${(r.reporterName ?? "").replace(/"/g, '""')}"`,
+      `"${(r.description ?? "").replace(/"/g, '""')}"`,
       r.upvotes,
       format(new Date(r.createdAt), "yyyy-MM-dd HH:mm"),
       r.resolvedAt ? format(new Date(r.resolvedAt), "yyyy-MM-dd HH:mm") : "",
     ]);
-    const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const csv  = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement("a");
-    a.href = url; a.download = `aquaalert-reports-${format(new Date(), "yyyy-MM-dd")}.csv`;
-    a.click(); URL.revokeObjectURL(url);
+    a.href = url;
+    a.download = `aquaalert-reports-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
     setDownloaded(true);
     setTimeout(() => setDownloaded(false), 3000);
   };
@@ -754,16 +1084,15 @@ function ExportTab() {
     <div className="space-y-6 max-w-2xl">
       <div>
         <h2 className="text-base font-bold text-slate-200 mb-1">Export Report Data</h2>
-        <p className="text-xs text-slate-500">Download all report records as a CSV file for use in internal records, GIS mapping, or further analysis.</p>
+        <p className="text-xs text-slate-500">Download all report records as a CSV file for internal records, GIS mapping, or analysis.</p>
       </div>
-
       <Card className="bg-slate-900 border-slate-800">
         <CardContent className="p-6 space-y-5">
           <div className="grid grid-cols-3 gap-4">
             {[
-              { label: "Total records", value: count, color: "text-slate-200" },
-              { label: "Active reports", value: summary?.pendingReports ?? "—", color: "text-cyan-400" },
-              { label: "Resolved", value: summary?.resolvedReports ?? "—", color: "text-emerald-400" },
+              { label: "Total records",   value: count,                          color: "text-slate-200" },
+              { label: "Active reports",  value: (summary?.pendingReports ?? 0) + (summary?.inProgressReports ?? 0), color: "text-amber-400" },
+              { label: "Resolved",        value: summary?.resolvedReports ?? 0,  color: "text-emerald-400" },
             ].map(({ label, value, color }) => (
               <div key={label} className="text-center p-3 bg-slate-950/60 rounded-xl border border-slate-800/40">
                 <div className={`text-2xl font-black tabular-nums ${color}`}>{value}</div>
@@ -773,11 +1102,10 @@ function ExportTab() {
           </div>
 
           <div className="p-4 bg-slate-950/60 rounded-xl border border-slate-800/40 text-xs text-slate-400 space-y-1">
-            <p className="font-semibold text-slate-300 mb-2">CSV includes the following columns:</p>
-            {["Report ID", "Title", "Ward / Area", "Severity (critical / high / medium / low)", "Status", "Reporter Name", "Upvotes / Verifications", "Date Submitted", "Date Resolved"].map(col => (
+            <p className="font-semibold text-slate-300 mb-2">Columns included in export:</p>
+            {["Report ID", "Title", "Ward / Area", "Severity", "Status", "Reporter Name", "Description", "Upvote Count", "Date Submitted (IST)", "Date Resolved (IST)"].map(col => (
               <div key={col} className="flex items-center gap-2">
-                <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" />
-                {col}
+                <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" />{col}
               </div>
             ))}
           </div>
@@ -788,11 +1116,9 @@ function ExportTab() {
               disabled={!reports || count === 0}
               className="w-full h-11 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.25)] gap-2"
             >
-              {downloaded ? (
-                <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Downloaded!</span>
-              ) : (
-                <span className="flex items-center gap-2"><Download className="w-4 h-4" />Download CSV ({count} records)</span>
-              )}
+              {downloaded
+                ? <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />Downloaded!</span>
+                : <span className="flex items-center gap-2"><Download className="w-4 h-4" />Download CSV ({count} records)</span>}
             </Button>
           </motion.div>
         </CardContent>
@@ -804,8 +1130,8 @@ function ExportTab() {
           <div className="space-y-2 text-xs text-slate-500">
             <p>• All timestamps are in IST (Asia/Kolkata, UTC+05:30).</p>
             <p>• Reports cover Mumbai wards within BMC jurisdiction only.</p>
-            <p>• Coordinates (latitude/longitude) are not included in this export. Use the map view for spatial data.</p>
-            <p>• Data refreshes every 60 seconds. Re-download to get the latest records.</p>
+            <p>• Coordinates are not included in this CSV. Use the Heatmap tab for spatial data.</p>
+            <p>• Re-download to get the latest records — data is live.</p>
           </div>
         </CardContent>
       </Card>
@@ -850,7 +1176,9 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       {/* Tab nav */}
       <div className="flex gap-1 px-6 lg:px-8 py-3 border-b border-slate-800 bg-slate-900/40 flex-shrink-0 overflow-x-auto">
         {TABS.map(tab => (
-          <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
               activeTab === tab.key
                 ? "bg-cyan-950/60 text-cyan-300 border border-cyan-900/60 shadow-[0_0_12px_rgba(6,182,212,0.1)]"
@@ -876,9 +1204,10 @@ function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             >
               {activeTab === "overview"    && <OverviewTab />}
               {activeTab === "reports"     && <ReportsTab />}
-              {activeTab === "heatmap"    && <HeatmapTab />}
+              {activeTab === "heatmap"     && <HeatmapTab />}
               {activeTab === "leaderboard" && <LeaderboardTab />}
-              {activeTab === "export"     && <ExportTab />}
+              {activeTab === "directory"   && <DirectoryTab />}
+              {activeTab === "export"      && <ExportTab />}
             </motion.div>
           </AnimatePresence>
         </div>

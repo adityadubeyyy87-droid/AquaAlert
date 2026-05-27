@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,8 +9,6 @@ import NotFound from "@/pages/not-found";
 import Home        from "@/pages/home";
 import Report      from "@/pages/report";
 import Leaderboard from "@/pages/leaderboard";
-import Reports     from "@/pages/reports/index";
-import ReportDetail from "@/pages/reports/detail";
 import AdminPage   from "@/pages/admin";
 import MyReports   from "@/pages/my-reports";
 import HowItWorks  from "@/pages/how-it-works";
@@ -38,15 +36,16 @@ function AnimatedRoutes() {
         style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column" }}
       >
         <Switch>
-          <Route path="/"              component={Home} />
-          <Route path="/report"        component={Report} />
-          <Route path="/leaderboard"   component={Leaderboard} />
-          <Route path="/reports"       component={Reports} />
-          <Route path="/reports/:id"   component={ReportDetail} />
-          <Route path="/admin"         component={AdminPage} />
-          <Route path="/my-reports"    component={MyReports} />
-          <Route path="/how-it-works"  component={HowItWorks} />
-          <Route path="/dashboard">{() => { window.location.replace("/admin"); return null; }}</Route>
+          <Route path="/"             component={Home} />
+          <Route path="/report"       component={Report} />
+          <Route path="/leaderboard"  component={Leaderboard} />
+          <Route path="/my-reports"   component={MyReports} />
+          <Route path="/how-it-works" component={HowItWorks} />
+          <Route path="/admin"        component={AdminPage} />
+          {/* All report browsing lives inside the municipality panel only */}
+          <Route path="/reports">{() => <Redirect to="/admin" />}</Route>
+          <Route path="/reports/:id">{() => <Redirect to="/admin" />}</Route>
+          <Route path="/dashboard">{() => <Redirect to="/admin" />}</Route>
           <Route component={NotFound} />
         </Switch>
       </motion.div>

@@ -1,0 +1,47 @@
+AquaAlert — Two-App Architecture Prompt
+AquaAlert should function as two distinct experiences within one platform. Every instruction below is mandatory. Do not skip, approximate, or partially implement any requirement. Apply each point strictly and completely.
+APP 1 — Public App (No Login Required)
+This is what every citizen sees by default. Make it feature-rich and engaging:
+Core Features:
+Live Map — view all active (unresolved) leak pins with severity color coding (red/amber/green). Resolved leaks vanish automatically
+Report a Leak — drop a pin, select severity, add description, submit. Under 60 seconds to complete
+Live Feed — scrolling list of recent reports with location, severity, time ago, and status badge
+Leaderboard — top reporters ranked by Eco Points, showing username, points, and tier badge (Newcomer → Guardian → Hero → Champion)
+My Reports — citizen can see their own submitted reports and their current status
+Stats Banner — show live numbers like total leaks reported, resolved this week, litres saved estimate
+How It Works — simple 3-step explainer section for new users
+Feel: Dark map aesthetic, vibrant severity colors, mobile-first, fast, zero friction
+STRICT RULE: Every single feature listed above must be present, functional, and visible in the public app. No feature may be left as a placeholder or stub. The public app must contain absolutely no dashboard, no directory, no reports management panel, and no admin functionality of any kind.
+APP 2 — Municipality Panel (Login Required)
+Accessible via a separate "Municipality Login" button/link. After entering Admin ID + Password, the full panel unlocks. The municipality panel is the only place where the dashboard, all reports, and directory exist. None of these must appear anywhere outside this panel under any circumstance.
+Core Features:
+Dashboard Overview — the one and only dashboard in the entire app. It must show: total reports, pending count, in progress count, resolved today count, avg resolution time. Every single number must be calculated live from real submitted report data. No hardcoded values. No approximations. If there is 1 report, dashboard shows 1. If there are 0 reports, dashboard shows 0. This is absolute
+All Reports — complete list of every submitted report, fully moved inside the municipality panel. Cut from anywhere it existed publicly and paste exclusively here. Each report shows: reporter name, location, severity, description, timestamp, current status. Filterable by severity, area, status, date
+Status Management — change any report from Pending → In Progress → Resolved. The moment a report is marked Resolved it must vanish instantly from the public map and public live feed and move into resolved archive. Active counts on dashboard must decrement immediately
+Heatmap View — density heatmap of leak clusters by area to prioritise field teams
+Leaderboard View — see top citizen reporters ranked by Eco Points
+Directory — full contact directory of field teams, ward officers, and department contacts. Strictly inside municipality panel only. Never accessible publicly via any route, URL, or method
+Export — download all report data as CSV
+Feel: Clean, professional, data-dense. Structured tables, status color badges, sidebar navigation, government dashboard aesthetic
+STRICT RULE: Dashboard, All Reports table, and Directory are exclusively inside the municipality panel. They do not exist anywhere else in the app. If they existed publicly before, they are completely removed from public view and relocated here. Every number on the dashboard reflects real data only — computed live, never hardcoded, never estimated.
+SEPARATION RULES — APPLY STRICTLY
+Public App and Municipality Panel are completely separate experiences with zero overlap in functionality
+The public app has: map, report form, live feed, leaderboard, my reports, stats banner, how it works. Nothing else
+The municipality panel has: dashboard, all reports, status management, heatmap, leaderboard view, directory, export. Nothing bleeds out to public
+Municipality login is a hard gate. Nothing inside the panel is accessible before authentication. Not via URL, not via inspect element, not via any route
+Resolved status change by municipality propagates to public app instantly and automatically. No refresh needed
+ACCURACY & DATA INTEGRITY — ZERO TOLERANCE
+1 report submitted = exactly 1 entry in all reports table, live feed, and map. Never duplicate, never ghost
+Dashboard numbers are always live — derived from actual report data at all times. Total, pending, in progress, resolved today must all update the instant a report is submitted or a status is changed
+Resolving a report removes it from public map and feed instantly, decrements active dashboard counters instantly, and moves it to resolved archive only
+Zero reports = zero everywhere — empty map, "No reports yet" in feed, all dashboard counters at 0. Nothing fabricated
+One single source of truth for all report data. Every view — map, feed, dashboard, table — reads from the same source. No view holds independent state
+Status changes propagate instantly across every view simultaneously with no inconsistency
+CONSISTENCY & QUALITY — APPLY STRICTLY
+City names: Mumbai, Bengaluru, Delhi, Chennai, Pune, Hyderabad only. Zero typos, zero variations
+Terminology: "Resolved", "Pending", "In Progress" — exact casing everywhere, no mixing
+No placeholder text, no lorem ipsum, no hardcoded demo data anywhere
+Phenomenal performance on mobile and desktop — no layout breaks, no console errors, no broken states
+Full end-to-end flow must work perfectly: citizen reports → appears on public map and feed → admin logs in → sees it in dashboard and reports table → marks resolved → vanishes from public instantly → archived in municipality panel only
+If any part of previous code conflicts with this prompt, this prompt takes full priority. Rewrite whatever is necessary
+There are no optional items. Every point is a hard requirement. The dashboard exists only inside the municipality panel. All report data is real and accurate. Build it completely, accurately, and to a phenomenal standard.

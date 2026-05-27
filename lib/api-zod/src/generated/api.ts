@@ -219,7 +219,9 @@ export const GetUserResponse = zod.object({
 export const GetDashboardSummaryResponse = zod.object({
   "totalReports": zod.number(),
   "pendingReports": zod.number(),
+  "inProgressReports": zod.number(),
   "resolvedReports": zod.number(),
+  "resolvedToday": zod.number(),
   "criticalReports": zod.number(),
   "totalEcoPoints": zod.number(),
   "activeWards": zod.number(),
