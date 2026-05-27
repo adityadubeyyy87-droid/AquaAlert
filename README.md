@@ -58,7 +58,7 @@ A **contract-first, full-stack civic platform** that transforms passive bystande
 ### 📊 Municipal Command Center
 
 
-![Dashboard](attached_assets/screenshot_dashboard.png)
+![Dashboard](https://github.com/adityadubeyyy87-droid/AquaAlert/blob/3f964e1746a0a747e8e9f74aaf988be16efa1fb8/Municipality%20dashboard.png)
 
 
 
