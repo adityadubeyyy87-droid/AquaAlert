@@ -51,7 +51,7 @@ A **contract-first, full-stack civic platform** that transforms passive bystande
 ### 🗺️ Live Leak Map
 
 
-![Map View](attached_assets/screenshot_map.png)
+![Map View](https://github.com/adityadubeyyy87-droid/AquaAlert/blob/9132f68cf75cb365dbd628f7d1282fb14cd431ed/Map%20view.png)
 
 
 
